@@ -47,6 +47,14 @@ Open sub-questions to grill:
    to Drive? move to R2?) and what protects the VPS from being the only
    copy of the processed stream.
 
+Language direction (2026-08-15): server side = **C# / ASP.NET Core** on the
+heirloom VPS (Minimal API + BackgroundService queue + SignalR for live
+status push; tiered-JIT performance + mature ecosystem beat Node/Python for
+this IO/transcode workload). Browser side stays Preact+TS+CSS - the visual
+direction is CSS-animation-first, no heavy wasm needed; .NET wasm AOT
+remains an option only if a future browser-side heavy job (waveform, decode)
+demands it. To be finalized during this ticket's grilling.
+
 ## Background
 
 - Song wall data model (see song-wall-data-model ticket): free JSON per song,
