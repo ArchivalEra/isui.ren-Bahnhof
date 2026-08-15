@@ -50,4 +50,32 @@ to react to, then settle the aesthetic.
 
 ## Resolution
 
-(filled in after prototyping, link the prototype asset; close this ticket afterwards)
+STATUS (2026-08-15): prototype v6 built on throwaway branch
+`prototype-visual-v1` (see `.wayfinder/HANDOFF.md` for full state). No
+winner picked yet — next agent must grill the owner and close this ticket.
+
+Prototype direction locked: board-on-a-wall window architecture
+(BoardWindow: fixed-ratio screens scaling as a unit, zero page scrollbars,
+edge hot-zones for in-window scrolling, phone..8K by construction);
+station-operations language (rail-blue LCD, hairline grid, signal colors as
+status codes). Variants: A = one long platform with direction signposts,
+B = live auto-scrolling departure board (most promising per owner), C =
+continuous tear-off ticket strip (nail-wall phase deferred by owner).
+
+Wins to fold into the real build once chosen; throwaway branch preserved
+per the prototype skill.
+
+## History
+
+- v1: Material You amber + iridescence + Tyndall — owner: design fine,
+  readability broken (white-on-white veil). Fixed layering.
+- v2: station-operations language applied — owner: "Material You has no
+  connection to realism", look at real German station systems. Research
+  closed (station-operations-visual-language.md).
+- v3/v4: windowed screens — owner: page scrollbars appeared, ticket+nail
+  swayed together (nails don't sway), phone/8K unhandled. Reworked to
+  BoardWindow + fixed nails + scale clamp.
+- v5: A narrowed, B auto-scroll, C horizontal strip — owner: "B finally
+  watchable, AC no" + stray blinking + scattered characters.
+- v6: B English status words + BEMERKUNG column + static seconds; A
+  platform signposts; C explicit height (was collapsing) — stable.
