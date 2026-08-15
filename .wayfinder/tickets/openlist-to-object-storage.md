@@ -2,8 +2,8 @@
 title: OpenList-to-object-storage feasibility
 slug: openlist-to-object-storage
 type: research
-status: open
-assignee: (unclaimed)
+status: closed
+assignee: research-subagent
 blocks: song-wall-data-model
 blocked-by: (none)
 ---
@@ -34,4 +34,19 @@ mainland China for each?
 
 ## Resolution
 
-(filled in by research subagent; close this ticket afterwards)
+OpenList cannot expose a netdisk as S3-compatible object storage: it is a
+file-list/WebDAV/HTTP gateway, with S3 appearing only as an input driver, and
+there is no S3-gateway or R2-output feature. Forcing it into an "object store"
+requires stacking the experimental `rclone serve s3` over a WebDAV mount -
+fragile, ToS-risky, and it needs a 24/7 VPS the project explicitly wants to
+avoid. For the song wall (small extensible-field JSON + images), Cloudflare R2
+(free 10GB / 1M Class A / free egress, S3 API, native Workers/Pages fit, same
+vendor as Bahnhof hosting) is the recommended primary store, with Oracle Object
+Storage (S3-compatible, free 50k req/mo + 10TB egress) as an optional mirror;
+reads in mainland China ride the existing EdgeOne/Cloudflare CDN path.
+OpenList+netdisk stays scoped to heart's 302 large-file chain and is dropped
+for song wall data.
+
+Full report: `.wayfinder/research/openlist-to-object-storage.md`
+(created 2026-08-15 by research subagent)
+
