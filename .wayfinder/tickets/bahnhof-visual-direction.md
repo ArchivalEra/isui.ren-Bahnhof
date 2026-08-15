@@ -23,9 +23,14 @@ to react to, then settle the aesthetic.
 
 - NO tayori content in Bahnhof (three balls stay out - they belong to tayori's
   pages). Realistic station vibe, NOT pure white/grey.
-- Material You dynamic color from browser/OS theme + iridescence accents
-  (research closed: seed amber + prefers-color-scheme + material-color-utilities).
-- Scrolling timetable element: yes.
+- Material You + station metaphor rejected (2026-08-15): "Material You has no
+  connection to realism" - look at real German station operations interfaces
+  instead. Research closed (station-operations-visual-language.md):
+  German station realism = dark rail-blue LCD board, hairline grid, tabular
+  numerals, letterspaced technical labels, signal colors ONLY as operational
+  status (green on-time / red delay / red strikethrough cancelled), technical
+  German labels (GLEIS 12, ABFAHRT, pünktlich, +6, fällt aus). Material You
+  survives only as the invisible theme mechanism (re-seed rail blue).
 - SONG WALL DISPLAY (very concrete vision): ticket cards!
   - Not-yet-listened songs: hang as ONE long folded ticket strip drifting
     gently on the page's left side, with bend/fold animation.

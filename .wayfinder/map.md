@@ -59,6 +59,15 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
   hue`) + blend/masks + `@property`, a11y-guarded; station realism = near-
   neutral surfaces + amber signal accents, aurora in seams. Full report:
   `.wayfinder/research/web-material-you-dynamic-color.md`.
+- [2026-08-15 - visual language REVISED] User rejected Material You anchoring
+  ("no connection to realism"); research on real German station ops closed
+  (station-operations-visual-language.md): realism = dark rail-blue LCD board
+  (#0E1B33/#132A4A), hairline grid, tabular numerals, letterspaced technical
+  labels, signal colors ONLY as status codes (green #029540 on-time / red
+  #E30613 delay+cancel-strikethrough / amber #FFB000 warn), technical German
+  labels (GLEIS 12, ABFAHRT, pünktlich, +6, fällt aus), board-as-object inset
+  frame. Material You survives only as invisible theme mechanism (re-seed
+  rail blue #0664AB); aurora demoted to faint LCD phosphor.
 - [2026-08-15 - song wall model draft] Completely free JSON per song (dozen+
   arbitrary keys + attached files). Status (listened/not) inside the object.
   Display vision: not-yet-listened = long folded ticket strip drifting on the
