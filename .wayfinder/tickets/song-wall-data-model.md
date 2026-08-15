@@ -39,13 +39,21 @@ Draft (grilled 2026-08-15; finalize after Material You research lands):
   renders whatever fields exist.
 - **Status**: tracked inside the object (listened / not-yet). Listened vs
   not drives the display form (see display).
+- **Processing state** (decided 2026-08-15): separate field per song -
+  unprocessed / processing / ready. "Ready" means an opus streaming copy
+  exists and the song is playable via Range direct link. Unprocessed songs
+  show the state on the page (and the user can trigger processing).
+- **Audio format**: opus for streaming playback (browser-native, range-play).
+  Original lossless stays in Google Drive untouched - opus is a streaming
+  preview copy; the owner will listen to the lossless original after
+  recovery. Processing is a decoupled subsystem (see processing-pipeline
+  ticket).
 - **Backend tension (open)**: user leans toward reading data via rclone from
   Google Drive (worried about needing another domain). Decision from the
   closed openlist research: Cloudflare R2 primary (S3 API, same vendor as
-  hosting). Resolution: R2 stays primary for serving; Google Drive via
-  rclone can be the authoring/mirror source if it costs no extra domain
-  (rclone can sync Drive -> R2 in the build, or Drive stays the human
-  editing surface and R2 serves the build output). To be finalized.
+  hosting). Resolution: the heirloom VPS is a transducer (pull Drive +
+  transcode + serve Range), not the archive; R2 stays for small data
+  (metadata JSON, covers). To be finalized with the pipeline design.
 - **Display (user's vision, very concrete)**: TICKET CARDS. Not-yet-listened
   songs hang as a long folded ticket strip drifting gently down the page's
   left side (bend/fold animation). Listened songs become little punched

@@ -60,12 +60,19 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
   neutral surfaces + amber signal accents, aurora in seams. Full report:
   `.wayfinder/research/web-material-you-dynamic-color.md`.
 - [2026-08-15 - song wall model draft] Completely free JSON per song (dozen+
-  arbitrary keys + attached files: cover, later audio/MV). Status (listened/
-  not) inside the object. Display vision: not-yet-listened = long folded
-  ticket strip drifting on the left; listened = punched stubs stacked on a
-  nail (diner-receipt style, random creases/torn corners); Tyndall light beam
-  top-left. Backend tension open: Google Drive via rclone (authoring?) vs R2
-  primary (serving) - to finalize.
+  arbitrary keys + attached files). Status (listened/not) inside the object.
+  Display vision: not-yet-listened = long folded ticket strip drifting on the
+  left; listened = punched stubs stacked on a nail (diner-receipt style,
+  random creases/torn corners); Tyndall light beam top-left.
+- [2026-08-15 - audio chain] The Oracle heirloom VPS (2c12g aarch64, 200G,
+  2Gbps Phoenix PAYG) is a TRANSDUCER, not a library: it pulls originals
+  from Google Drive, transcodes to opus, serves Range-able direct links;
+  browser <audio> streams progressively (nobody downloads whole files).
+  Processing is a DECOUPLED subsystem (see processing-pipeline ticket) with
+  its own state machine (unprocessed/processing/ready) triggered by a
+  "process" button on the song page. Original lossless STAYS in Google Drive
+  forever - opus is only the streaming preview copy (owner listens to
+  lossless after recovery).
 
 ## Tickets
 
@@ -75,19 +82,21 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
 | openlist-to-object-storage | research | closed | - |
 | web-material-you-dynamic-color | research | closed | - |
 | song-wall-data-model | grilling | open (draft) | - |
+| processing-pipeline | grilling | open | - |
 | site-structure-navigation | grilling | closed | - |
 | bahnhof-visual-direction | prototype | open | site-structure-navigation |
 | heart-bahnhof-card | task | open | Bahnhof v1 output |
 
 ## Not yet specified
 
-- **Song-wall write path**: Google Drive (rclone) as authoring surface vs R2
-  as serving path - the "no extra domain" constraint vs the closed research
-  (R2 primary). Data flow: human edits where, build syncs how?
-- **Song-wall field granularity**: the free-JSON shape is decided; which
-  concrete keys v1 ships with, and how the page renders arbitrary fields.
-- **Cover art + audio/MV**: storage & serving path (R2 bucket? same origin?),
-  playback scope (dozens of formats, MV) - later phase.
+- **Song-wall write path**: where the free-JSON metadata lives (repo? R2?) and
+  how the song wall reads it (build-time? client fetch?) - small data,
+  settled by the R2 decision, exact flow open.
+- **Processing pipeline internals**: trigger API shape, status storage +
+  refresh, ffmpeg flags, Range serving endpoint, CDN interaction, cleanup -
+  see processing-pipeline ticket (grilling next).
+- **Cover art + MV**: storage & serving path (R2 bucket? same origin?),
+  playback scope (MV player later phase).
 - **Blog content channel**: who writes, about what (recovery diary?
   listening notes?), publishing flow (markdown in repo?).
 - **Deployment chain**: Bahnhof build (base `/Bahnhof/`) joins heart's deploy
