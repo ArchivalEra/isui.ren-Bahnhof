@@ -16,11 +16,24 @@ What is Bahnhof's visual direction? Build a cheap, rough prototype for the user
 to react to, then settle the aesthetic.
 
 - How does "station" visualize: signboard / timetable / platform / track? Or
-  stay abstract (grey tones + shadows)?
-- What role do the three balls play: waiting passengers? a train? or offstage?
-- Continue heart's white + grey + three-color balls (pink/blue/green), or a new
-  palette?
+  stay abstract?
 - Dynamic elements: station electronic signage? clock? scrolling timetable?
+
+## User input so far (grilled 2026-08-15)
+
+- NO tayori content in Bahnhof (three balls stay out - they belong to tayori's
+  pages). Realistic station vibe, NOT pure white/grey.
+- Material You dynamic color from browser/OS theme + iridescence accents
+  (research closed: seed amber + prefers-color-scheme + material-color-utilities).
+- Scrolling timetable element: yes.
+- SONG WALL DISPLAY (very concrete vision): ticket cards!
+  - Not-yet-listened songs: hang as ONE long folded ticket strip drifting
+    gently on the page's left side, with bend/fold animation.
+  - Listened songs: little punched stubs stacked into an approximate circle on
+    a single nail, like American diner receipts; each stub has random creases
+    and torn corners - the whole "ticket wall" becomes instantly realistic.
+  - Top-left corner: Tyndall-effect light beam across the scene (light rays
+    through dusty air).
 
 ## Background
 

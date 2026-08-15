@@ -51,33 +51,53 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
   `deploy` branch - both lines serve `isui.ren/Bahnhof/*` from the same
   project with zero routing. Full report:
   `.wayfinder/research/edgeone-subpath-binding.md`.
+- [2026-08-15 - dynamic color] Research closed: no browser exposes the real
+  Material You accent on the open web. Implement: site-chosen amber seed +
+  `prefers-color-scheme` light/dark, runtime palette via
+  `@material/material-color-utilities` (`themeFromSourceColor`/`applyTheme`),
+  `--md-sys-color-*` vars; iridescence via CSS gradients (`in oklch longer
+  hue`) + blend/masks + `@property`, a11y-guarded; station realism = near-
+  neutral surfaces + amber signal accents, aurora in seams. Full report:
+  `.wayfinder/research/web-material-you-dynamic-color.md`.
+- [2026-08-15 - song wall model draft] Completely free JSON per song (dozen+
+  arbitrary keys + attached files: cover, later audio/MV). Status (listened/
+  not) inside the object. Display vision: not-yet-listened = long folded
+  ticket strip drifting on the left; listened = punched stubs stacked on a
+  nail (diner-receipt style, random creases/torn corners); Tyndall light beam
+  top-left. Backend tension open: Google Drive via rclone (authoring?) vs R2
+  primary (serving) - to finalize.
 
 ## Tickets
 
 | ticket | type | status | blocked-by |
 |--------|------|--------|------------|
-| edgeone-subpath-binding | research | open | - |
+| edgeone-subpath-binding | research | closed | - |
 | openlist-to-object-storage | research | closed | - |
-| web-material-you-dynamic-color | research | open | - |
-| song-wall-data-model | grilling | open | openlist-to-object-storage |
+| web-material-you-dynamic-color | research | closed | - |
+| song-wall-data-model | grilling | open (draft) | - |
 | site-structure-navigation | grilling | closed | - |
 | bahnhof-visual-direction | prototype | open | site-structure-navigation |
-| heart-bahnhof-card | task | open | edgeone-subpath-binding |
+| heart-bahnhof-card | task | open | Bahnhof v1 output |
 
 ## Not yet specified
 
-- **Song-wall field granularity**: which "extensible variables" one song
-  records (title/artist/source/link/why-to-listen/tags/status...), and how
-  the song wall reads/writes R2 (build-time JSON? client fetch? admin?).
-  Backend decided (R2), the write/read path and schema are not.
+- **Song-wall write path**: Google Drive (rclone) as authoring surface vs R2
+  as serving path - the "no extra domain" constraint vs the closed research
+  (R2 primary). Data flow: human edits where, build syncs how?
+- **Song-wall field granularity**: the free-JSON shape is decided; which
+  concrete keys v1 ships with, and how the page renders arbitrary fields.
+- **Cover art + audio/MV**: storage & serving path (R2 bucket? same origin?),
+  playback scope (dozens of formats, MV) - later phase.
 - **Blog content channel**: who writes, about what (recovery diary?
   listening notes?), publishing flow (markdown in repo?).
-- **Deployment chain**: does Bahnhof share the same EdgeOne/Pages project as
-  heart, build and release flow.
+- **Deployment chain**: Bahnhof build (base `/Bahnhof/`) joins heart's deploy
+  branch; how the two builds compose (heart's build.sh vs Bahnhof's), what
+  ships where.
 - **Station map layout**: which "platforms" sit on the home map and how they
   are arranged; where the scrolling timetable lives.
-- **Iridescence execution**: how the aurora/iridescence accent is rendered
-  (CSS gradients? canvas? WebGL?) - depends on the Material You research.
+- **Ticket-card rendering**: folded-strip vs stubbed-nail mechanics, crease/
+  torn-corner generation, Tyndall beam - graduates when the visual prototype
+  runs.
 
 ## Out of scope
 

@@ -2,8 +2,8 @@
 title: Web Material You dynamic color research
 slug: web-material-you-dynamic-color
 type: research
-status: open
-assignee: (unclaimed)
+status: closed
+assignee: research-subagent
 blocks: bahnhof-visual-direction
 blocked-by: (none)
 ---
@@ -47,4 +47,26 @@ works on the web in 2026:
 
 ## Resolution
 
-(filled in by research subagent; close this ticket afterwards)
+In 2026 no web browser exposes the user's Material You accent or wallpaper
+palette to normal pages - the `dynamic-color-scheme` media query never
+shipped (absent from MQ5, MDN, CSSWG), and `AccentColor`/`AccentColorText`
+system colors are fingerprinting-gated (Chrome: fixed value in normal tabs,
+real accent only in installed web apps, behind a flag at M150; Safari:
+fallback only; Firefox: keywords since 103). Bahnhof should therefore
+implement "dynamic color" as: site-chosen amber seed + `prefers-color-scheme`
+light/dark, generated at runtime with the official
+`@material/material-color-utilities` (npm 0.4.0) via
+`themeFromSourceColor`/`applyTheme` (or `SchemeExpressive` for higher
+chroma), writing `--md-sys-color-*` vars on `:root`, plus a best-effort
+`AccentColor` seed inside installed-PWA context. Iridescence/aurora is
+achievable with CSS gradients (`conic`/`linear`/`radial`, `in oklch longer
+hue`), blend modes, masks, and `@property` animation, guarded by
+`prefers-reduced-motion`, `prefers-reduced-transparency` (Chrome/Firefox
+only), and `prefers-contrast`; canvas 2D only if a curling animated aurora
+is required. Station realism comes from MCU's near-neutral surfaces + amber
+signal accents, with aurora confined to seams (clock, timetable header,
+active row).
+
+Full report: `.wayfinder/research/web-material-you-dynamic-color.md`
+(created 2026-08-15 by research subagent)
+
