@@ -5,7 +5,10 @@ type: task
 status: open
 assignee: (unclaimed)
 blocks: (none)
-blocked-by: edgeone-subpath-binding
+blocked-by: (none)
+
+> note: pending Bahnhof v1 implementation (needs /Bahnhof/ output in deploy
+> branch before the card points somewhere real)
 ---
 
 # heart Bahnhof card
@@ -14,8 +17,12 @@ blocked-by: edgeone-subpath-binding
 
 Add a "Bahnhof station" card to heart's card wall (pointing at
 isui.ren/Bahnhof) by editing heart repo's `web-ui/public/config.json`.
-Manual task; execute after the EdgeOne subpath research confirms Bahnhof's
-landing URL.
+URL confirmed (research closed 2026-08-15): `isui.ren/Bahnhof` - the
+landing URL is settled and needs no domain changes.
+
+Execution is blocked on Bahnhof v1 actually shipping (its build output must
+exist under `/Bahnhof/` in the deploy branch first, or the card points at
+404). Revisit after Bahnhof v1 implementation lands.
 
 ## Background
 

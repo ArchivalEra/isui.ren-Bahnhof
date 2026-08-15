@@ -34,8 +34,6 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
   converted to object storage.
 - [2026-08-15 - blog form] Maintain one site only; blog is an in-site feature,
   no separate service.
-- [2026-08-15 - landing] TBD: how isui.ren/Bahnhof coexists with heart's root
-  domain on EdgeOne (research ticket below).
 - [2026-08-15 - site structure] Pages v1 = home (station map) + blog + song
   wall; navigation = station-map style (regions laid out like platforms).
 - [2026-08-15 - visual direction] NOT heart's white/grey aesthetic. Material
@@ -47,6 +45,12 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
   Oracle OSS as optional mirror; OpenList+netdisk dropped for song wall data
   (kept only for heart's 302 large-file chain). Full report:
   `.wayfinder/research/openlist-to-object-storage.md`.
+- [2026-08-15 - landing] Research closed: neither EdgeOne Makers nor CF Pages
+  supports subpath binding. Fix needs no domain changes: build Bahnhof with
+  base path `/Bahnhof/` and ship its static output inside heart's existing
+  `deploy` branch - both lines serve `isui.ren/Bahnhof/*` from the same
+  project with zero routing. Full report:
+  `.wayfinder/research/edgeone-subpath-binding.md`.
 
 ## Tickets
 
