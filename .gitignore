@@ -1,0 +1,45 @@
+# =====================================================================
+# Whitelist-style .gitignore
+#
+# Default policy: ignore EVERYTHING. Only paths explicitly whitelisted
+# via the `!` negations below are tracked by git.
+#
+# To allow a new path, add a `!` exception under "Whitelist".
+# To allow a whole subtree, use `<dir>/**` (the parent directory itself
+# is already kept traversable by the `!*/` rule above it).
+#
+# Repo rules (see README.md):
+#   - NO Chinese characters anywhere in this repo.
+#     Enforced by .githooks/pre-commit.
+#   - Emoji are allowed, but use them sparingly.
+# =====================================================================
+
+# Ignore everything, at every level.
+*
+
+# But keep every directory traversable, so the exceptions below can
+# re-include files inside them.
+!*/
+
+# ---------------------------------------------------------------------
+# Whitelist
+# ---------------------------------------------------------------------
+
+# This file itself
+!.gitignore
+
+# Enforced repo rules (pre-commit hook)
+!.githooks/**
+
+# Existing license
+!LICENSE
+
+# Documentation
+!README.md
+!docs/**
+
+# CI / workflows
+!.github/**
+
+# Helper scripts
+!scripts/**
