@@ -82,6 +82,12 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
   "process" button on the song page. Original lossless STAYS in Google Drive
   forever - opus is only the streaming preview copy (owner listens to
   lossless after recovery).
+- [2026-08-15 - visual language: prototype v6] Prototype built on throwaway
+  branch `prototype-visual-v1` (BoardWindow fixed-ratio windows, hall wall,
+  no page scrollbars, phone..8K). Three variants (A: platform signposts,
+  B: live auto-scrolling departure board, C: tear-off ticket strip). Language
+  decision closed; winner selection deferred to task
+  `bahnhof-winner-selection`. (ticket: bahnhof-visual-direction)
 
 ## Tickets
 
@@ -93,7 +99,8 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
 | song-wall-data-model | grilling | open (draft) | - |
 | processing-pipeline | grilling | open | - |
 | site-structure-navigation | grilling | closed | - |
-| bahnhof-visual-direction | prototype | open | site-structure-navigation |
+| bahnhof-visual-direction | prototype | closed | site-structure-navigation |
+| bahnhof-winner-selection | task | open | bahnhof-visual-direction |
 | heart-bahnhof-card | task | open | Bahnhof v1 output |
 
 ## Not yet specified
@@ -111,11 +118,6 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
 - **Deployment chain**: Bahnhof build (base `/Bahnhof/`) joins heart's deploy
   branch; how the two builds compose (heart's build.sh vs Bahnhof's), what
   ships where.
-- **Station map layout**: which "platforms" sit on the home map and how they
-  are arranged; where the scrolling timetable lives.
-- **Ticket-card rendering**: folded-strip vs stubbed-nail mechanics, crease/
-  torn-corner generation, Tyndall beam - graduates when the visual prototype
-  runs.
 
 ## Out of scope
 

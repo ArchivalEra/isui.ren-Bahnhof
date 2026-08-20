@@ -2,8 +2,8 @@
 title: Bahnhof visual direction prototype
 slug: bahnhof-visual-direction
 type: prototype
-status: open
-assignee: (unclaimed)
+status: closed
+assignee: zcode
 blocks: (none)
 blocked-by: site-structure-navigation
 ---
@@ -50,19 +50,28 @@ to react to, then settle the aesthetic.
 
 ## Resolution
 
-STATUS (2026-08-15): prototype v6 built on throwaway branch
-`prototype-visual-v1` (see `.wayfinder/HANDOFF.md` for full state). No
-winner picked yet — next agent must grill the owner and close this ticket.
+PROTOTYPE v6 BUILT on throwaway branch `prototype-visual-v1` (see
+`.wayfinder/HANDOFF.md` for the full build log). Direction locked on the
+level of *language* (board-on-a-wall windows, station-operations look); the
+level of *selection* (which variant wins, what to steal from each) is deferred
+to a follow-up decision ticket (see `bahnhof-winner-selection`).
 
-Prototype direction locked: board-on-a-wall window architecture
-(BoardWindow: fixed-ratio screens scaling as a unit, zero page scrollbars,
-edge hot-zones for in-window scrolling, phone..8K by construction);
-station-operations language (rail-blue LCD, hairline grid, signal colors as
-status codes). Variants: A = one long platform with direction signposts,
-B = live auto-scrolling departure board (most promising per owner), C =
-continuous tear-off ticket strip (nail-wall phase deferred by owner).
+Branch verified: `web-ui/` (Preact+Vite+TS), BoardWindow = fixed-ratio windows
+scaling as a unit, zero page scrollbars, edge hot-zones for in-window
+scrolling, centreline alignment copied from heart (`.stage-window`),
+phone..8K by construction; rail-blue LCD (`#0E1B33`/`#132A4A`), hairline grid,
+tabular numerals, letterspaced technical labels, signal colors as status codes
+only. Three variants as of v6:
+- A = one long platform with direction signposts (1200x400);
+- B = live auto-scrolling departure board, most promising per owner
+  (marquee, BEMERKUNG column, English status words, fade masks at edges);
+- C = continuous tear-off ticket strip (1500 wide, square covers, TICKET
+  NO., random paper tones, vertical perforations — nail-wall phase deferred).
 
-Wins to fold into the real build once chosen; throwaway branch preserved
+Owner has not picked a winner yet. Close this ticket as the **language**
+decision; spin up a `task` ticket `bahnhof-winner-selection` (blocked by
+this ticket) whose job is to grill the owner, fold the winner into the real
+`web-ui/` on `main` (base `/Bahnhof/`), and archive the throwaway branch
 per the prototype skill.
 
 ## History
