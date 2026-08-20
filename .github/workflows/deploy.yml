@@ -1,0 +1,72 @@
+# Bahnhof -> heart/deploy/Bahnhof
+# Direct deploy to the shared deploy branch: Bahnhof builds once and ships
+# its dist into deploy/Bahnhof (isui.ren/Bahnhof/*). heart's deploy is
+# merged, not wiped — so blog rebuilds no longer pay heart's wasm cost.
+name: deploy
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web-ui/package-lock.json
+
+      - name: Build Bahnhof
+        run: |
+          cd web-ui
+          npm ci
+          npm run build
+          echo "Built Bahnhof dist:"
+          ls -la dist/ | sed -n '1,20p'
+
+      - name: Push Bahnhof dist to heart deploy/Bahnhof
+        env:
+          HEART_DEPLOY_KEY: ${{ secrets.HEART_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${HEART_DEPLOY_KEY:-}" ]; then
+            echo "::error::HEART_DEPLOY_KEY is not set (Settings -> Secrets and variables -> Actions -> HEART_DEPLOY_KEY = contents of /opt/reasonix-cradle/kicad-girl/github_key)"
+            exit 1
+          fi
+
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$HEART_DEPLOY_KEY" > ~/.ssh/heart_deploy
+          chmod 600 ~/.ssh/heart_deploy
+          ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          export GIT_SSH_COMMAND='ssh -i ~/.ssh/heart_deploy -o StrictHostKeyChecking=yes -o IdentitiesOnly=yes'
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          rm -rf /tmp/heart-deploy
+          git clone --branch deploy --depth 1 git@github.com:ArchivalEra/isui.ren-heart.git /tmp/heart-deploy 2>&1 | tail -5
+
+          # Replace only Bahnhof/ inside deploy; heart's root stays intact.
+          rm -rf /tmp/heart-deploy/Bahnhof
+          mkdir -p /tmp/heart-deploy/Bahnhof
+          cp -r web-ui/dist/* /tmp/heart-deploy/Bahnhof/
+
+          cd /tmp/heart-deploy
+          git add Bahnhof
+          if git diff --cached --quiet; then
+            echo "No changes in Bahnhof dist; nothing to push."
+            exit 0
+          fi
+          git commit -m "deploy Bahnhof: $(date -u +%Y-%m-%dT%H:%M:%SZ) from Bahnhof $GITHUB_SHA"
+          git push origin deploy 2>&1 | tail -10
