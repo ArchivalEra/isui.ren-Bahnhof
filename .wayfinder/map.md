@@ -88,6 +88,10 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
   B: live auto-scrolling departure board, C: tear-off ticket strip). Language
   decision closed; winner selection deferred to task
   `bahnhof-winner-selection`. (ticket: bahnhof-visual-direction)
+- [2026-08-15 - visual winner: B] Winner: **B — live departure board**.
+  AC are fully archived on `prototype-visual-v1` and will not advance. See
+  tickets `bahnhof-winner-selection` (closed) and the B production landing on
+  `main` (`web-ui/` with base `/Bahnhof/`).
 
 ## Tickets
 
@@ -100,7 +104,7 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
 | processing-pipeline | grilling | open | - |
 | site-structure-navigation | grilling | closed | - |
 | bahnhof-visual-direction | prototype | closed | site-structure-navigation |
-| bahnhof-winner-selection | task | open | bahnhof-visual-direction |
+| bahnhof-winner-selection | task | closed | bahnhof-visual-direction |
 | heart-bahnhof-card | task | open | Bahnhof v1 output |
 
 ## Not yet specified

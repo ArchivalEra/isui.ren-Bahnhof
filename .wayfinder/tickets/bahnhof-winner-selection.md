@@ -2,8 +2,8 @@
 title: Bahnhof winner selection
 slug: bahnhof-winner-selection
 type: task
-status: open
-assignee: (unclaimed)
+status: closed
+assignee: zcode
 blocks: (none)
 blocked-by: bahnhof-visual-direction
 ---
@@ -36,4 +36,12 @@ promising but has not picked a final direction or a mix-and-match.
 
 ## Resolution
 
-(filled in after grilling + implementation; close this ticket afterwards)
+Decision: **B wins. A and C are fully archived.** (2026-08-15, in this session.)
+
+- B — live departure board — selected as the production base. A (platform)
+  and C (tear-off ticket strip) are archived on `prototype-visual-v1` and
+  will not advance. The "nail wall" phase for C is explicitly deferred,
+  per the owner's prior deferral; it remains archived, not promoted.
+- Next: fold B into the real `web-ui/` on `main` with base `/Bahnhof/`
+  (EdgeOne landing research closed), branch `bahnhof/B` holds the iterative
+  implementation branch. Prototype branch preserved per skill.

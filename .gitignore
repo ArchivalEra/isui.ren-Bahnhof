@@ -46,3 +46,6 @@
 
 # Helper scripts
 !scripts/**
+
+# Bahnhof production site (winner: B — live departure board)
+!web-ui/**
