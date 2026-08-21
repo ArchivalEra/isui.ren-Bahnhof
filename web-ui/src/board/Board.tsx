@@ -1,5 +1,6 @@
 // Bahnhof — live departure board (winner: B). A single board-on-a-wall:
-// fixed-ratio window (BoardWindow) inside a station hall, no page scrollbars.
+// BoardShell handles the window layout; Board renders the departure board.
+import { useEffect, useState } from "preact/hooks";
 import BoardShell from "../components/BoardShell";
 import ProfileSwitcher from "../theme/Switcher";
 import { departures, songs, stations } from "./data";
@@ -19,52 +20,76 @@ function statusText(note: string): string {
 
 function Row({ d, now }: { d: (typeof departures)[number]; now?: boolean }) {
   return (
-    <div className={"v-b row" + (now ? " now" : "")}>
-      <span className={"v-b time" + (statusClass(d.note) === "cxl" ? " cxl" : "")}>{d.time}</span>
-      <span className={"v-b badge " + d.train.replace(/\s+/g, "-").toLowerCase()}>{d.train}</span>
-      <span className="v-b dest">{d.dest}</span>
-      <span className="v-b plat">{d.platform}</span>
-      <span className={"v-b status " + statusClass(d.note)}>
-        {now && <span className="v-b mark">▌</span>}
+    <div className={"v-b row" + (now ? " now" : "")} role="row">
+      <span className={"v-b time" + (statusClass(d.note) === "cxl" ? " cxl" : "")} role="cell">{d.time}</span>
+      <span className={"v-b badge " + d.train.replace(/\s+/g, "-").toLowerCase()} role="cell">{d.train}</span>
+      <span className="v-b dest" role="cell">{d.dest}</span>
+      <span className="v-b plat" role="cell">{d.platform}</span>
+      <span className={"v-b status " + statusClass(d.note)} role="cell">
+        {now && <span className="v-b mark" aria-hidden="true">▌</span>}
         {statusText(d.note)}
       </span>
-      <span className="v-b bem">{d.bem}</span>
+      <span className="v-b bem" role="cell">{d.bem}</span>
     </div>
   );
 }
 
 const SCROLL_ROWS = departures.slice(0, 12);
 
+function useClock(): string {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+}
+
+function useClockSeconds(): string {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
+  return String(now.getSeconds()).padStart(2, "0");
+}
+
 export default function Board() {
   const heard = songs.filter((s) => s.status === "listened").length;
-  const next = departures[0]; // the next departure highlights the now row
+  const next = departures[0];
+  const clockHM = useClock();
+  const clockSec = useClockSeconds();
+  const updatedAt = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return (
     <BoardShell baseW={1280} label="ZUGANZEIGER · GLEIS 1–3">
       <div className="v-b">
-        <div className="v-b board">
+        <div className="v-b board" role="table" aria-label="Departure board">
           <div className="v-b board-title">
             <span className="v-b brand">ISUI.REN — HAUPTBAHNHOF</span>
             <ProfileSwitcher />
-            <span className="v-b clock">
-              09:12<span className="v-b clock-sec">:04</span>
+            <span className="v-b clock" aria-live="off">
+              {clockHM}
+              <span className="v-b clock-sec">:{clockSec}</span>
             </span>
           </div>
-          <div className="v-b board-cols">
-            <span>ZEIT</span>
-            <span>ZUG</span>
-            <span>NACH</span>
-            <span>GLEIS</span>
-            <span>STATUS</span>
-            <span>BEMERKUNG</span>
+          <div className="v-b board-cols" role="row">
+            <span role="columnheader">ZEIT</span>
+            <span role="columnheader">ZUG</span>
+            <span role="columnheader">NACH</span>
+            <span role="columnheader">GLEIS</span>
+            <span role="columnheader">STATUS</span>
+            <span role="columnheader">BEMERKUNG</span>
           </div>
 
-          {/* fixed "now" row: the next departure, always visible */}
-          <div className="v-b now-bar">
+          <div className="v-b now-bar" aria-label="Next departure">
             <Row d={next} now />
           </div>
 
-          {/* auto-scrolling rows (two copies, seamless marquee) */}
-          <div className="v-b marquee">
+          <div
+            className="v-b marquee"
+            tabIndex={0}
+            aria-label="Upcoming departures, auto-scrolling. Hover or focus to pause"
+          >
             <div className="v-b marquee-inner">
               {[...SCROLL_ROWS, ...SCROLL_ROWS].map((d, i) => (
                 <Row d={d} key={d.time + i} />
@@ -72,7 +97,7 @@ export default function Board() {
             </div>
           </div>
 
-          <div className="v-b foot">AKTUALISIERT 09:12:04 · SOLL/IST · {stations.length} BAHNSTEIGE · {songs.length} LIEDER · {heard} GEHÖRT</div>
+          <div className="v-b foot">AKTUALISIERT {updatedAt} · SOLL/IST · {stations.length} BAHNSTEIGE · {songs.length} LIEDER · {heard} GEHÖRT</div>
         </div>
       </div>
     </BoardShell>

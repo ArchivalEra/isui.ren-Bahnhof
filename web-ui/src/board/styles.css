@@ -222,7 +222,8 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neu
   background: linear-gradient(0deg, #0e1b33 0%, rgb(14 27 51 / 0.75) 45%, transparent 100%);
 }
 .v-b.marquee-inner { animation: b-scroll 30s linear infinite; }
-.v-b.marquee:hover .v-b.marquee-inner { animation-play-state: paused; }
+.v-b.marquee:hover .v-b.marquee-inner,
+.v-b.marquee:focus-within .v-b.marquee-inner { animation-play-state: paused; }
 @keyframes b-scroll {
   from { transform: translateY(0); }
   to { transform: translateY(-50%); }
