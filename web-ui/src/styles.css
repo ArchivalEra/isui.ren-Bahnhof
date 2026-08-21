@@ -169,8 +169,8 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   min-height: 60vh;
 }
 
-/* full-page theme flood overlay */
-.flood {
+/* radial theme flood overlay */
+.theme-flood {
   position: fixed;
   inset: 0;
   width: 100vw;
@@ -178,4 +178,10 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   z-index: 80;
   pointer-events: none;
   display: none;
+}
+
+/* float: content refracts through the wave while it expands */
+.wrap.wobbling { filter: url(#bahnhof-float); animation: float-pulse 700ms ease-out; }
+@keyframes float-pulse {
+  40% { transform: scale(1.014); }
 }
