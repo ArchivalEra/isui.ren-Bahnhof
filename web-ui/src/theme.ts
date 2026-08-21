@@ -2,7 +2,7 @@
 // heart = pure white & grey (default), heart-dark = inverted,
 // station = rail blue legacy. Add a profile here and the switcher
 // picks it up automatically.
-import { signal } from "@preact/signals";
+import { signal, effect } from "@preact/signals";
 
 export interface Profile {
   id: string;
@@ -90,27 +90,28 @@ export function setProfile(id: string): void {
   }
 }
 
-/** Apply profile tokens to :root. Call once at startup. */
+function applyProfile(): void {
+  const p = currentProfile();
+  for (const [k, v] of Object.entries(p.tokens)) {
+    document.documentElement.style.setProperty(k, v);
+  }
+  document.documentElement.dataset.profile = p.id;
+  document.documentElement.style.colorScheme = p.dark ? "dark" : "light";
+}
+
+/** Re-applies tokens reactively: profile switches take effect instantly. */
 export function initTheme(): void {
-  const apply = () => {
-    const p = currentProfile();
-    for (const [k, v] of Object.entries(p.tokens)) {
-      document.documentElement.style.setProperty(k, v);
-    }
-    document.documentElement.dataset.profile = p.id;
-    document.documentElement.style.colorScheme = p.dark ? "dark" : "light";
-  };
-  apply();
-  // React to system changes only while on auto (no explicit save yet is
-  // approximated by re-applying; explicit choice persists via setProfile).
+  effect(applyProfile);
+  // follow system preference only while the user has not made an explicit choice
   window
     .matchMedia("(prefers-color-scheme: dark)")
     .addEventListener("change", () => {
-      if (!localStorage.getItem(STORAGE_KEY)) {
-        currentId.value = window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "heart-dark"
-          : "heart";
-        apply();
+      let saved: string | null = null;
+      try {
+        saved = localStorage.getItem(STORAGE_KEY);
+      } catch {
+        /* storage unavailable */
       }
+      if (!saved) currentId.value = systemPreference();
     });
 }
