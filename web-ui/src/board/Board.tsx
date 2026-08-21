@@ -68,9 +68,9 @@ export default function Board() {
           <div className="v-b board-title">
             <span className="v-b brand">ISUI.REN — HAUPTBAHNHOF</span>
             <ProfileSwitcher />
-            <span className="v-b clock" aria-live="off">
+            <span className="v-b clock" aria-live="off" aria-label={`Current time ${clockHM}:${clockSec}`}>
               {clockHM}
-              <span className="v-b clock-sec">:{clockSec}</span>
+              <span className="v-b clock-sec" aria-hidden="true">:{clockSec}</span>
             </span>
           </div>
           <div className="v-b board-cols" role="row">
