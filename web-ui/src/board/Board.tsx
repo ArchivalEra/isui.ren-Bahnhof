@@ -18,12 +18,21 @@ function statusText(note: string): string {
   return note; // "+6" style short codes pass through
 }
 
+function DestCell({ dest }: { dest: string }) {
+  const href = dest === "home" ? "/heart" : dest === "blog" ? "/Bahnhof/blog" : "/Bahnhof/song-wall";
+  return (
+    <a className="v-b dest" role="cell" href={href}>
+      {dest}
+    </a>
+  );
+}
+
 function Row({ d, now }: { d: (typeof departures)[number]; now?: boolean }) {
   return (
     <div className={"v-b row" + (now ? " now" : "")} role="row">
       <span className={"v-b time" + (statusClass(d.note) === "cxl" ? " cxl" : "")} role="cell">{d.time}</span>
       <span className={"v-b badge " + d.train.replace(/\s+/g, "-").toLowerCase()} role="cell">{d.train}</span>
-      <span className="v-b dest" role="cell">{d.dest}</span>
+      <DestCell dest={d.dest} />
       <span className="v-b plat" role="cell">{d.platform}</span>
       <span className={"v-b status " + statusClass(d.note)} role="cell">
         {now && <span className="v-b mark" aria-hidden="true">▌</span>}

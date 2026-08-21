@@ -176,7 +176,9 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neu
 .v-b.badge.re-4, .v-b.badge.re-7, .v-b.badge.re-2 { color: var(--signal-delay); border-color: rgb(227 6 19 / 0.6); }
 .v-b.badge.ic-221, .v-b.badge.ic-44 { color: var(--signal-warn); border-color: rgb(255 176 0 / 0.55); }
 .v-b.badge.s-3, .v-b.badge.s-9, .v-b.badge.rb-12 { color: var(--signal-ok); border-color: rgb(2 149 64 / 0.6); }
-.v-b.dest { font-weight: 700; letter-spacing: 0.05em; }
+.v-b.dest { font-weight: 700; letter-spacing: 0.05em; color: var(--board-text); text-decoration: none; }
+.v-b.dest:hover { text-decoration: underline; text-underline-offset: 3px; }
+.v-b.dest:focus-visible { outline: 2px solid var(--anchor); outline-offset: 2px; border-radius: 2px; }
 .v-b.plat { color: var(--board-dim); }
 .v-b.status { font-size: 14px; text-align: right; letter-spacing: 0.04em; }
 .v-b.status.ok { color: var(--signal-ok); }
