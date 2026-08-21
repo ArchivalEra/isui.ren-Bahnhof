@@ -106,5 +106,13 @@ export function generateTimetable(now: Date, count = 10): Departure[] {
     });
   }
 
-  return out.sort((a, b) => a.minutesAway - b.minutesAway).slice(0, count);
+  const sorted = out.sort((a, b) => a.minutesAway - b.minutesAway).slice(0, count);
+  // realism: exactly one train can be boarding - the earliest departure,
+  // and only when it is genuinely imminent. Everything else stays scheduled.
+  sorted.forEach((d, i) => {
+    if (d.state === "boarding" && !(i === 0 && d.minutesAway <= 2)) {
+      d.state = "ontime";
+    }
+  });
+  return sorted;
 }
