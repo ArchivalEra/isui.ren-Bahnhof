@@ -55,19 +55,26 @@ export const profiles: Profile[] = [
 
 const STORAGE_KEY = "bahnhof-profile";
 
-export const currentId = signal<string>(loadInitial());
+function systemPreference(): string {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches
+    ? "heart-dark"
+    : "heart";
+}
 
 function loadInitial(): string {
+  // ?theme= overrides everything (handy for screenshots/tests)
+  const param = new URLSearchParams(window.location.search).get("theme");
+  if (param && profiles.some((p) => p.id === param)) return param;
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && profiles.some((p) => p.id === saved)) return saved;
   } catch {
     /* storage unavailable */
   }
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "heart-dark"
-    : "heart";
+  return systemPreference();
 }
+
+export const currentId = signal<string>(loadInitial());
 
 export function currentProfile(): Profile {
   return profiles.find((p) => p.id === currentId.value) ?? profiles[0];

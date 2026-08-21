@@ -1,9 +1,10 @@
 // Bahnhof — live departure board.
-// Native <table>: browsers lay out columns natively, no flex/grid fights.
+// The timetable is generated from the real clock (see timetable.ts) and
+// rolls forward every minute; a native <table> lays out the columns.
 import { useEffect, useState } from "preact/hooks";
 import { signal, computed } from "@preact/signals";
 import { profiles, currentId, currentProfile, setProfile } from "./theme";
-import { departures, destHref, songs } from "./data";
+import { generateTimetable } from "./timetable";
 
 const paused = signal(false);
 const now = signal(new Date());
@@ -12,23 +13,10 @@ setInterval(() => {
   now.value = new Date();
 }, 1000);
 
+const timetable = computed(() => generateTimetable(now.value));
 const clockHM = computed(() =>
   now.value.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
 );
-
-function statusText(note: string): string {
-  if (note === "on time") return "ON TIME";
-  if (note === "cancelled") return "CANCELLED";
-  if (note === "now boarding") return "BOARDING";
-  return note; // "+6" style codes pass through
-}
-
-function statusClass(note: string): string {
-  if (note === "cancelled") return "cxl";
-  if (note.startsWith("+")) return "del";
-  if (note === "now boarding") return "board";
-  return "ok";
-}
 
 function ThemePicker() {
   return (
@@ -47,19 +35,31 @@ function ThemePicker() {
   );
 }
 
+function StatusCell({ d }: { d: ReturnType<typeof generateTimetable>[number] }) {
+  if (d.state === "boarding")
+    return (
+      <span class="status board">
+        <span class="mark" aria-hidden="true">▌ </span>BOARDING
+      </span>
+    );
+  if (d.state === "cancelled") return <span class="status cxl">CANCELLED</span>;
+  if (d.state === "delay")
+    return <span class="status del">+{d.delayMin}</span>;
+  return <span class="status ok">ON TIME</span>;
+}
+
 export default function Board() {
-  const [, tick] = useState(0);
-  // re-render once per second via the shared interval
+  const [, setTick] = useState(0);
+  // keep seconds display alive (signals cover minute-level changes)
   useEffect(() => {
-    const id = setInterval(() => tick((n) => n + 1), 1000);
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(id);
   }, []);
 
   const hm = clockHM.value;
   const sec = String(now.value.getSeconds()).padStart(2, "0");
   const updated = now.value.toLocaleTimeString("de-DE");
-  const heard = songs.filter((s) => s.status === "listened").length;
-  const profile = currentProfile();
+  const rows = timetable.value;
 
   return (
     <div class="wrap">
@@ -85,7 +85,7 @@ export default function Board() {
         </div>
       </header>
 
-      <table class="board" data-profile={profile.id}>
+      <table class="board">
         <thead>
           <tr>
             <th scope="col">ZEIT</th>
@@ -96,30 +96,27 @@ export default function Board() {
             <th scope="col" class="remark-col">BEMERKUNG</th>
           </tr>
         </thead>
-        <tbody class={paused.value ? "paused" : ""}>
-          {departures.map((d) => (
-            <tr key={d.time + d.train} class={d.note === "now boarding" ? "now" : ""}>
-              <td class={d.note === "cancelled" ? "cxl" : ""}>{d.time}</td>
+        <tbody>
+          {rows.map((d) => (
+            <tr key={`${d.time}-${d.train}`} class={d.state === "boarding" ? "now" : ""}>
+              <td class={d.state === "cancelled" ? "cxl" : ""}>{d.time}</td>
               <td>
-                <span class={"badge b-" + d.train.replace(/\s+/g, "-").toLowerCase()}>{d.train}</span>
+                <span class={"badge b-" + d.train.replace(/\s+/g, "-").toLowerCase()}>
+                  {d.train}
+                </span>
               </td>
               <td>
-                <a href={destHref(d.dest)}>{d.dest}</a>
+                <a href={d.destHref}>{d.dest}</a>
               </td>
               <td>{d.platform}</td>
-              <td class={"status " + statusClass(d.note)}>
-                {d.note === "now boarding" && <span class="mark" aria-hidden="true">▌ </span>}
-                {statusText(d.note)}
-              </td>
+              <td><StatusCell d={d} /></td>
               <td class="remark-col">{d.remark ?? ""}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <footer class="foot">
-        AKTUALISIERT {updated} · SOLL/IST · {songs.length} LIEDER · {heard} GEHOERT
-      </footer>
+      <footer class="foot">AKTUALISIERT {updated} · SOLL/IST · LIVE</footer>
     </div>
   );
 }
