@@ -8,46 +8,65 @@
    Palette & language: .wayfinder/research/station-operations-visual-language.md
    ===================================================================== */
 
-/* ---------- station palette ---------- */
+/* ---------- palette: heart tokens (default) + signal colors ----------
+   Base tokens match isui.ren-heart pure white & grey; dark/station
+   profiles override via [data-profile] below (see src/theme/profiles.ts).
+   BoardWindow scale hack removed — BoardShell uses CSS-only overflow. */
 :root {
-  --board-bg: #0e1b33;
-  --board-bg-alt: #132a4a;
-  --board-line: rgb(242 239 231 / 0.14);
-  --board-rule: rgb(242 239 231 / 0.07);
-  --board-text: #f2efe7;
-  --board-dim: #a9b2c4;
+  --surface: #ffffff;
+  --surface-dim: #fafafa;
+  --surface-variant: #f2f2f2;
+  --surface-container: #ececec;
+  --outline: #d9d9d9;
+  --outline-variant: #b3b3b3;
+  --on-surface: #111111;
+  --on-surface-variant: #4d4d4d;
+  --state-hover: rgba(17,17,17,0.05);
+  --state-active: rgba(17,17,17,0.10);
+  --shape-lg: 28px;
+  --shape-md: 16px;
+  --shape-sm: 10px;
+  --board-bg: var(--surface);
+  --board-bg-alt: var(--surface-container);
+  --board-line: var(--outline);
+  --board-rule: var(--outline-variant);
+  --board-text: var(--on-surface);
+  --board-dim: var(--on-surface-variant);
   --signal-ok: #029540;
   --signal-delay: #e30613;
   --signal-warn: #ffb000;
   --anchor: #0664ab;
-  --paper: #f5f2ea;
-  --ink: #1a1a18;
+  --paper: var(--surface);
+  --ink: var(--on-surface);
+  --hall: var(--surface-variant);
+}
+
+[data-profile="station"] {
+  --board-bg: #0e1b33;
+  --board-bg-alt: #132a4a;
+  --board-text: #f2efe7;
+  --board-dim: #a9b2c4;
   --hall: #0a1426;
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
-/* the page NEVER scrolls — boards are windows whose content scrolls inside */
-html, body { overflow: hidden; height: 100dvh; }
 body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif; }
 
 /* ---------- the HALL (viewport-level atmosphere only) ---------- */
 .hall {
   position: fixed; inset: 0;
-  background:
-    radial-gradient(60% 42% at 30% 22%, rgb(18 48 92 / 0.5), transparent 70%),
-    radial-gradient(52% 46% at 76% 72%, rgb(14 46 88 / 0.4), transparent 72%),
-    var(--hall);
+  background: var(--hall);
   overflow: hidden;
 }
 .hall-wall {
   position: absolute; inset: 0;
-  background-image: radial-gradient(rgb(242 239 231 / 0.05) 1px, transparent 1.6px);
+  background-image: radial-gradient(color-mix(in srgb, var(--on-surface) 6%, transparent) 1px, transparent 1.6px);
   background-size: 26px 26px;
 }
 .hall-phosphor {
   position: absolute; inset: 0;
-  background: radial-gradient(60% 42% at 30% 22%, rgb(18 48 92 / 0.55), transparent 70%),
+  background: radial-gradient(60% 42% at 30% 22%, color-mix(in srgb, var(--board-bg) 40%, transparent), transparent 70%),
               radial-gradient(52% 46% at 76% 72%, rgb(14 46 88 / 0.45), transparent 72%);
   filter: blur(30px);
 }
@@ -67,59 +86,35 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neu
 .hall-beam.strong { width: 68vw; }
 .hall-beam.strong::before { width: 20%; opacity: 0.85; }
 
-/* ---------- BoardWindow: the fixed-width window on the hall wall ----------
-   Center alignment, heart's stage-window mechanism: left/top 50% +
-   translate(-50%,-50%) keeps the window's centerline on the viewport
-   centerline at every scale (heart uses negative margins + origin:center;
-   we keep the scale inside .bw-stage so translate stays free for centering). */
-.bw {
-  position: fixed; left: 50%; top: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 2;
-  display: flex; flex-direction: column; align-items: center; gap: 14px;
+/* ---------- BoardShell: lightweight CSS-only window ---------- */
+.board-shell {
+  container-type: inline-size;
+  max-width: 1280px;
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
-.bw-wrap { position: relative; }
-.bw-scroll {
+.board-scroll {
   overflow: auto;
+  max-height: min(68vh, 560px);
+  scrollbar-gutter: stable;
   background: var(--board-bg);
   border: 1px solid var(--board-line);
   border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgb(242 239 231 / 0.10),
-              inset 0 2px 12px rgb(0 0 0 / 0.5),
-              0 30px 80px rgb(0 0 0 / 0.55);
-  scrollbar-width: thin;
-  scrollbar-color: rgb(242 239 231 / 0.25) transparent;
+  box-shadow: inset 0 0 0 1px rgba(17,17,17,0.06),
+              inset 0 2px 12px rgba(17,17,17,0.08),
+              0 18px 40px rgba(17,17,17,0.12);
 }
-.bw-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-.bw-scroll::-webkit-scrollbar-thumb { background: rgb(242 239 231 / 0.22); border-radius: 4px; }
-.bw-scroll::-webkit-scrollbar-thumb:hover { background: rgb(242 239 231 / 0.4); }
-.bw-scroll::-webkit-scrollbar-track { background: transparent; }
-.bw-fill { position: relative; }
-.bw-stage { transform-origin: top left; }
-
-.bw-label {
+.board-label {
   font-size: 11px; letter-spacing: 0.26em; text-transform: uppercase;
   color: var(--board-dim);
   white-space: nowrap;
   padding-left: 4px;
 }
-
-/* edge hot-zones: steer scrolling direction by proximity */
-.bw-zone {
-  position: absolute; z-index: 5;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  background: rgb(6 100 171 / 0.10);
-  display: flex; align-items: center; justify-content: center;
-  cursor: grab;
-}
-.bw-zone:hover, .bw-zone:active { opacity: 1; }
-.bw-zone-bottom { bottom: 0; left: 0; right: 0; height: 52px; border-top: 1px solid rgb(6 100 171 / 0.4); }
-.bw-zone-right { top: 0; right: 0; bottom: 0; width: 52px; border-left: 1px solid rgb(6 100 171 / 0.4); }
-.bw-arrows {
-  font-size: 12px; letter-spacing: 0.2em;
-  color: var(--anchor);
-  text-shadow: 0 0 10px rgb(6 100 171 / 0.8);
+@container (max-width: 640px) {
+  .v-b.board-cols, .v-b.row { grid-template-columns: 90px 110px 1fr 70px 150px; }
+  .v-b.bem { display: none; }
 }
 
 /* ---------- shared technical bits ---------- */
@@ -135,74 +130,6 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neu
 @keyframes board-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
 @media (prefers-reduced-motion: reduce) {
   .hall-beam::before { animation: none; }
-}
-
-/* =====================================================================
-   Variant A — Platform (1200x400, one long platform end to end)
-   ===================================================================== */
-.v-a { position: relative; width: 1200px; height: 400px; }
-
-.v-a.head {
-  position: absolute; left: 40px; top: 26px; right: 40px;
-  display: flex; align-items: flex-end; justify-content: space-between;
-}
-.v-a.sign { border-left: 3px solid var(--anchor); padding-left: 14px; }
-.v-a.sign-name { display: block; font-size: 26px; font-weight: 800; letter-spacing: 0.3em; color: var(--board-text); }
-.v-a.sign-sub { display: block; font-size: 10px; letter-spacing: 0.22em; color: var(--board-dim); margin-top: 4px; }
-.v-a.clock { text-align: right; }
-.v-a.clock-time { display: block; font-size: 30px; font-weight: 700; letter-spacing: 0.08em; color: var(--board-text); }
-.v-a.clock-mark { display: block; color: var(--signal-warn); font-size: 12px; animation: board-blink 2s steps(2, start) infinite; }
-
-/* the platform: full-width slab, edge line on top */
-.v-a.platform {
-  position: absolute; left: 40px; right: 40px; top: 138px; height: 118px;
-  background: linear-gradient(180deg, #152a48, #0f2140);
-  border: 1px solid var(--board-line);
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgb(242 239 231 / 0.08), inset 0 4px 14px rgb(0 0 0 / 0.5);
-}
-.v-a.platform-edge {
-  position: absolute; top: 0; left: 0; right: 0;
-  display: flex; align-items: center; gap: 14px;
-  height: 26px;
-  border-bottom: 1px solid rgb(242 239 231 / 0.25);
-  background: rgb(242 239 231 / 0.05);
-}
-.v-a.platform-num {
-  font-size: 9px; font-weight: 800; letter-spacing: 0.22em;
-  color: var(--signal-warn);
-  padding-left: 12px;
-}
-.v-a.platform-line { flex: 1; height: 4px; background: rgb(242 239 231 / 0.12); }
-
-/* direction signs standing on the platform (like station exit signs) */
-.v-a.signpost {
-  position: absolute; top: 34px; height: 78px;
-  background: var(--board-bg);
-  border: 1px solid rgb(242 239 231 / 0.3);
-  border-left: 4px solid var(--anchor);
-  border-radius: 2px;
-  box-shadow: inset 0 0 0 1px rgb(242 239 231 / 0.08), 0 8px 20px rgb(0 0 0 / 0.45);
-  display: flex; align-items: center; gap: 12px;
-  padding: 0 14px;
-  color: var(--board-text);
-  cursor: pointer;
-  text-align: left;
-}
-.v-a.signpost:hover { border-left-color: var(--signal-warn); background: var(--board-bg-alt); }
-.v-a.signpost:focus-visible { outline: 1px solid var(--anchor); outline-offset: -1px; }
-.v-a.signpost-dir { font-size: 22px; font-weight: 800; color: var(--signal-warn); }
-.v-a.signpost-text { display: flex; flex-direction: column; min-width: 0; }
-.v-a.signpost-name { display: block; font-size: 17px; font-weight: 800; letter-spacing: 0.12em; }
-.v-a.signpost-sub { display: block; font-size: 9px; letter-spacing: 0.18em; color: var(--board-dim); margin-top: 2px; }
-
-/* the track below the platform */
-.v-a.track { position: absolute; left: 40px; right: 40px; top: 288px; }
-.v-a.track-line {
-  display: block; height: 8px;
-  background:
-    repeating-linear-gradient(90deg, rgb(242 239 231 / 0.22) 0 30px, transparent 30px 46px),
-    rgb(242 239 231 / 0.06);
 }
 
 /* =====================================================================
@@ -311,106 +238,12 @@ body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neu
   text-align: right;
 }
 
-/* =====================================================================
-   Variant C — Ticket wall (1024x760 screen)
-   ===================================================================== */
-.v-c { position: relative; width: 1500px; height: 720px; }
 
-.v-c.head { position: absolute; top: 30px; left: 0; right: 0; text-align: center; }
-.v-c.head-name { display: block; font-size: 22px; font-weight: 800; letter-spacing: 0.34em; color: var(--board-text); }
-.v-c.head-sub { display: block; font-size: 10px; letter-spacing: 0.24em; color: var(--board-dim); margin-top: 5px; }
-
-/* the strip track: a faint rail the tickets sit on */
-.v-c.strip-track {
-  position: absolute; top: 226px; left: 24px; right: 24px; height: 4px;
-  background: repeating-linear-gradient(90deg, rgb(242 239 231 / 0.28) 0 30px, transparent 30px 46px),
-              rgb(242 239 231 / 0.08);
+/* Profile switcher — header clock row */
+.profile-switcher { display: inline-flex; align-items: center; gap: 8px; }
+.profile-switcher-label { font-size: 14px; color: var(--board-dim); }
+.profile-switcher select {
+  background: var(--surface); color: var(--on-surface);
+  border: 1px solid var(--outline); border-radius: 6px;
+  padding: 4px 8px; font-size: 12px;
 }
-
-/* the continuous ticket strip: wide tickets side by side, connected by
-   vertical perforations, overflowing the window to the right -> horizontal
-   scroll inside (bottom-edge hot zone) */
-.v-c.strip {
-  position: absolute; top: 140px; left: 24px; right: 0;
-  display: flex;
-  align-items: stretch;
-  padding-bottom: 90px;
-}
-
-/* one ticket: wide rectangle, square cover, perforation at the right */
-.v-c.ticket {
-  width: 252px; height: 172px;
-  padding: 12px 14px 12px 12px;
-  color: var(--ink);
-  position: relative;
-  display: flex; gap: 12px;
-  flex: 0 0 auto;
-  border: 1px solid rgb(26 26 24 / 0.10);
-  box-shadow: 0 6px 16px rgb(0 0 0 / 0.45);
-}
-.v-c.ticket:first-child { border-radius: 3px 0 0 3px; }
-
-/* square cover: fixed size regardless of text length */
-.v-c.t-cover {
-  width: 148px; height: 148px;
-  border-radius: 2px;
-  flex: 0 0 auto;
-  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.10);
-}
-
-.v-c.t-body {
-  display: flex; flex-direction: column; gap: 4px;
-  min-width: 0; flex: 1;
-}
-.v-c.t-no {
-  font-size: 9.5px; font-weight: 800; letter-spacing: 0.16em;
-  color: #6b665a;
-}
-.v-c.t-title {
-  font-size: 14.5px; font-weight: 800; line-height: 1.2;
-  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-}
-.v-c.t-desc { font-size: 10px; color: #6b665a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.v-c.t-why {
-  font-size: 10px; font-style: italic; opacity: 0.85;
-  border-top: 1px dashed rgb(26 26 24 / 0.3); padding-top: 4px;
-  margin-top: auto;
-  overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-}
-
-/* vertical perforation: the tear-off line connecting tickets */
-.v-c.t-perf {
-  position: absolute; top: 0; right: -3px; bottom: 0; width: 6px;
-  background: radial-gradient(circle at 3px 7px, transparent 3px, rgb(26 26 24 / 0.20) 3.2px 3.8px, transparent 4px) repeat-y;
-  background-size: 6px 14px;
-}
-
-/* the ragged torn end of the roll */
-.v-c.roll-end {
-  width: 6px; flex: 0 0 auto;
-  background: repeating-linear-gradient(180deg, rgb(242 239 231 / 0.10) 0 8px, transparent 8px 14px);
-  align-self: stretch;
-  margin-left: 2px;
-}
-
-/* =====================================================================
-   Prototype switcher (never ships to production)
-   ===================================================================== */
-.proto-bar {
-  position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
-  z-index: 99;
-  display: flex; align-items: center; gap: 10px;
-  background: var(--board-bg);
-  color: var(--board-text);
-  border: 1px solid var(--board-line);
-  border-radius: 3px;
-  box-shadow: inset 0 0 0 1px rgb(242 239 231 / 0.10), 0 8px 30px rgb(0 0 0 / 0.5);
-  padding: 6px 10px;
-}
-.proto-bar button {
-  background: transparent; border: none; color: inherit;
-  font-size: 16px; padding: 6px 10px;
-}
-.proto-bar button:hover { background: var(--board-bg-alt); }
-.proto-label { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; padding: 0 4px; }
-.proto-label em { font-style: normal; font-weight: 400; opacity: 0.55; font-size: 10px; }

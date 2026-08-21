@@ -1,6 +1,7 @@
 // Bahnhof — live departure board (winner: B). A single board-on-a-wall:
 // fixed-ratio window (BoardWindow) inside a station hall, no page scrollbars.
-import BoardWindow from "./BoardWindow";
+import BoardShell from "../components/BoardShell";
+import ProfileSwitcher from "../theme/Switcher";
 import { departures, songs, stations } from "./data";
 
 function statusClass(note: string): string {
@@ -38,11 +39,12 @@ export default function Board() {
   const heard = songs.filter((s) => s.status === "listened").length;
   const next = departures[0]; // the next departure highlights the now row
   return (
-    <BoardWindow baseW={1280} label="ZUGANZEIGER · GLEIS 1–3">
-      <div className="v-b" style={{ width: 1280 }}>
+    <BoardShell baseW={1280} label="ZUGANZEIGER · GLEIS 1–3">
+      <div className="v-b">
         <div className="v-b board">
           <div className="v-b board-title">
             <span className="v-b brand">ISUI.REN — HAUPTBAHNHOF</span>
+            <ProfileSwitcher />
             <span className="v-b clock">
               09:12<span className="v-b clock-sec">:04</span>
             </span>
@@ -73,6 +75,6 @@ export default function Board() {
           <div className="v-b foot">AKTUALISIERT 09:12:04 · SOLL/IST · {stations.length} BAHNSTEIGE · {songs.length} LIEDER · {heard} GEHÖRT</div>
         </div>
       </div>
-    </BoardWindow>
+    </BoardShell>
   );
 }
