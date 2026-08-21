@@ -36,30 +36,22 @@ function Row({ d, now }: { d: (typeof departures)[number]; now?: boolean }) {
 
 const SCROLL_ROWS = departures.slice(0, 12);
 
-function useClock(): string {
+function useNow(): Date {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
-  return now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
-}
-
-function useClockSeconds(): string {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-  return String(now.getSeconds()).padStart(2, "0");
+  return now;
 }
 
 export default function Board() {
   const heard = songs.filter((s) => s.status === "listened").length;
   const next = departures[0];
-  const clockHM = useClock();
-  const clockSec = useClockSeconds();
-  const updatedAt = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const now = useNow();
+  const clockHM = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const clockSec = String(now.getSeconds()).padStart(2, "0");
+  const updatedAt = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return (
     <BoardShell baseW={1280} label="ZUGANZEIGER · GLEIS 1–3">
       <div className="v-b">
