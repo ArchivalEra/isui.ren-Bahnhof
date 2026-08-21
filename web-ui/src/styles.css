@@ -1,0 +1,142 @@
+/* Bahnhof — heart white/grey tokens, native table layout.
+   No flex/grid column fights: <table> handles it natively. */
+
+:root {
+  --surface: #ffffff;
+  --surface-dim: #fafafa;
+  --surface-variant: #f2f2f2;
+  --outline: #d9d9d9;
+  --on-surface: #111111;
+  --on-surface-variant: #4d4d4d;
+  --signal-ok: #029540;
+  --signal-delay: #e30613;
+  --signal-warn: #b46a00;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.wrap {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1rem 3rem;
+}
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.head h1 {
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.28em;
+  margin: 0;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+
+.theme-picker,
+.toggle {
+  background: var(--surface);
+  color: var(--on-surface);
+  border: 1px solid var(--outline);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+}
+.toggle { min-width: 2.2rem; }
+.theme-picker:focus-visible,
+.toggle:focus-visible {
+  outline: 2px solid var(--signal-warn);
+  outline-offset: 2px;
+}
+
+.clock {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.sec { font-size: 0.85rem; color: var(--on-surface-variant); }
+
+/* the board itself — a real table */
+.board {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--outline);
+}
+.board th,
+.board td {
+  text-align: left;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid var(--outline);
+  font-size: 0.95rem;
+}
+.board th {
+  font-size: 0.65rem;
+  letter-spacing: 0.22em;
+  color: var(--on-surface-variant);
+  border-bottom-width: 2px;
+}
+.board tbody tr:hover { background: var(--surface-dim); }
+.board tbody tr.now { background: rgba(180, 106, 0, 0.08); }
+.board tbody tr.now td:first-child { box-shadow: inset 3px 0 0 var(--signal-warn); }
+
+.badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  border: 1px solid var(--outline);
+  padding: 0.1rem 0.45rem;
+}
+.b-re-4, .b-re-7, .b-re-2 { color: var(--signal-delay); border-color: var(--signal-delay); }
+.b-ic-221, .b-ic-44 { color: var(--signal-warn); border-color: var(--signal-warn); }
+.b-s-3, .b-s-9, .b-s-6, .b-s-12, .b-s-15, .b-rb-12, .b-rb-17, .b-rb-20, .b-rb-23 { color: var(--signal-ok); border-color: var(--signal-ok); }
+
+.board a { color: var(--on-surface); font-weight: 700; text-decoration: none; }
+.board a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.board a:focus-visible { outline: 2px solid var(--signal-warn); outline-offset: 2px; }
+
+.status.ok { color: var(--signal-ok); }
+.status.del { color: var(--signal-delay); font-weight: 700; }
+.status.cxl { color: var(--signal-delay); }
+.status.board { color: var(--signal-warn); font-weight: 700; }
+.mark { animation: blink 1.2s steps(2, start) infinite; }
+@keyframes blink { 50% { opacity: 0.3; } }
+
+td.cxl { color: var(--signal-delay); text-decoration: line-through; }
+
+.foot {
+  margin-top: 0.75rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  color: var(--on-surface-variant);
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .remark-col { display: none; }
+  .wrap { padding: 1rem 0.6rem 2rem; }
+  .clock { font-size: 1.15rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark { animation: none; }
+}

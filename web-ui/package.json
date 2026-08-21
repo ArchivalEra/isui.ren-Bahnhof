@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@material/material-color-utilities": "^0.4.0",
+    "@preact/signals": "^2.11.1",
     "preact": "^10.29.8"
   },
   "devDependencies": {
