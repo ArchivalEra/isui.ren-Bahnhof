@@ -185,7 +185,9 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   z-index: 60;
 }
 .scene-from { z-index: 1; }
-.scene-band { z-index: 2; filter: url(#bahnhof-float); }
+/* displacement pushes pixels outward: the band must be allowed to spill
+   past the viewport instead of being hard-clipped into frayed edges */
+.scene-band { z-index: 2; filter: url(#bahnhof-float); overflow: visible; }
 .band-clip {
   position: absolute;
   inset: 0;

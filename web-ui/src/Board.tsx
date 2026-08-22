@@ -21,7 +21,7 @@ const speedParam =
   typeof window !== "undefined"
     ? Number(new URLSearchParams(window.location.search).get("wavespeed"))
     : NaN;
-const WAVE_MS = Number.isFinite(speedParam) && speedParam >= 200 ? speedParam : 1600;
+const WAVE_MS = Number.isFinite(speedParam) && speedParam >= 200 ? speedParam : 1000;
 
 /** Isolated live clock: re-renders itself every second, nothing else. */
 function Clock() {
@@ -43,6 +43,7 @@ function Clock() {
 }
 
 let wobbleDefsReady = false;
+let wobbleMap: SVGFEDisplacementMapElement | null = null;
 /** Inject (once) the turbulence+displacement filter used by the rim. */
 function ensureWobbleFilter(): string {
   const id = "bahnhof-float";
@@ -55,13 +56,23 @@ function ensureWobbleFilter(): string {
   svg.setAttribute("height", "0");
   svg.style.position = "absolute";
   svg.innerHTML = `
-    <filter id="${id}" x="-10%" y="-10%" width="120%" height="120%">
+    <filter id="${id}" x="-30%" y="-30%" width="160%" height="160%">
       <feTurbulence type="fractalNoise" baseFrequency="0.011 0.017" numOctaves="2" seed="11" result="n"/>
       <feDisplacementMap in="SourceGraphic" in2="n" scale="30" xChannelSelector="R" yChannelSelector="G"/>
     </filter>`;
   document.body.appendChild(svg);
+  wobbleMap = svg.querySelector("feDisplacementMap");
   wobbleDefsReady = true;
   return `url(#${id})`;
+}
+
+const WOBBLE_SCALE = 30;
+/** The flood calms down as it reaches the far edges: displacement fades
+ *  to zero over the last stretch so no frayed pixels can survive there. */
+function wobbleScaleAt(t: number): number {
+  const fadeStart = 0.78;
+  if (t <= fadeStart) return WOBBLE_SCALE;
+  return Math.max(0, WOBBLE_SCALE * (1 - (t - fadeStart) / (1 - fadeStart)));
 }
 
 function StatusCell({ d }: { d: Departure }) {
@@ -189,6 +200,7 @@ export default function Board() {
           const cpBand = `path("${ringPath(cx, cy, R - 24, R + BAND_W)}")`;
           if (toRef.current) toRef.current.style.clipPath = cpTo;
           if (bandRef.current) bandRef.current.style.clipPath = cpBand;
+          wobbleMap?.setAttribute("scale", String(wobbleScaleAt(t)));
             if (t < 1) requestAnimationFrame(frame);
             else resolve();
           };
