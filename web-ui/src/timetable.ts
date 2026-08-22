@@ -1,9 +1,8 @@
-// Realistic timetable generation — departures are derived from the real
-// current time, never hardcoded. Each line runs on a fixed cycle (like a
-// real S-Bahn/Bahn network); the generator projects the next departures
-// from `now` and derives status deterministically from the schedule slot,
-// so the same minute always renders the same board and rows roll forward
-// naturally as time passes.
+// Live departure scheduler — the board is a rolling queue driven by the
+// real clock. Lines run on fixed cycles (like a real Bahn network); rows
+// depart when due, linger briefly, leave, and the tail refills in strict
+// time order. All randomness is deterministic per schedule slot, so the
+// same train is always the same train.
 
 export type Dest = "home" | "blog" | "song-wall";
 
@@ -22,7 +21,7 @@ const LINES: Line[] = [
   { train: "RB 12", dest: "blog", platform: "2", cycleMin: 30, offsetMin: 19 },
   { train: "RE 4", dest: "home", platform: "1", cycleMin: 60, offsetMin: 24 },
   { train: "IC 44", dest: "song-wall", platform: "3", cycleMin: 120, offsetMin: 31 },
-  { train: "S 9", dest: "song-wall", platform: "3", cycleMin: 20, offsetMin: 44 },
+  { train: "S 9", dest: "song-wall", platform: "3", cycleMin: 20, offsetMin: 46 },
   { train: "RE 2", dest: "home", platform: "1", cycleMin: 30, offsetMin: 49 },
 ];
 
@@ -35,6 +34,16 @@ const REMARKS = [
   "Kinderwagen",
 ];
 
+const DEST_HREF: Record<Dest, string> = {
+  home: "/heart",
+  blog: "/Bahnhof/blog",
+  "song-wall": "/Bahnhof/song-wall",
+};
+
+export const MAX_ROWS = 12;
+/** How long a DEPARTED / due-CANCELLED row stays before it leaves. */
+export const LINGER_MS = 3000;
+
 /** Deterministic pseudo-random in [0,1) from an integer seed. */
 function rand(seed: number): number {
   const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
@@ -42,77 +51,135 @@ function rand(seed: number): number {
 }
 
 export interface Departure {
-  time: string;
-  minutesAway: number;
+  id: string; // stable identity across ticks
+  time: string; // scheduled HH:MM
+  departsAtMs: number;
   train: string;
   dest: Dest;
   destHref: string;
   platform: string;
-  /** "boarding" | "ontime" | "delay" | "cancelled" */
-  state: "boarding" | "ontime" | "delay" | "cancelled";
+  /** spawn-time fate; the runtime overlays boarding/departed on top */
+  state: "ontime" | "delay" | "cancelled" | "departed";
   delayMin?: number;
   remark?: string;
+  /** set when due: the moment this row should vanish */
+  removalAt?: number;
 }
 
-const DEST_HREF: Record<Dest, string> = {
-  home: "/heart",
-  blog: "/Bahnhof/blog",
-  "song-wall": "/Bahnhof/song-wall",
-};
+interface Spawn {
+  line: Line;
+  slot: number; // cycle index, stable identity for a concrete train
+  departsAtMs: number;
+}
 
-/**
- * Build the board for `now`: for every line find its next departure at
- * least 1 minute out, project status from distance + slot hash.
- */
-export function generateTimetable(now: Date, count = 10): Departure[] {
-  const epochMin = Math.floor(now.getTime() / 60000);
-  const out: Departure[] = [];
+/** First scheduled departure of `line` strictly after `tMs`. */
+function nextSpawn(line: Line, tMs: number): Spawn {
+  const cyc = line.cycleMin * 60000;
+  const anchor = line.offsetMin * 60000;
+  const k = Math.max(0, Math.floor((tMs - anchor) / cyc) + 1);
+  return { line, slot: k, departsAtMs: anchor + k * cyc };
+}
 
-  for (const line of LINES) {
-    // next scheduled slot strictly after the current minute
-    const phase = ((epochMin - line.offsetMin) % line.cycleMin + line.cycleMin) % line.cycleMin;
-    const inMin = line.cycleMin - phase; // minutes until next departure
-    const slot = Math.floor((epochMin + inMin) / line.cycleMin); // stable slot id
+function materialize(sp: Spawn): Departure {
+  const d = new Date(sp.departsAtMs);
+  const hh = String(d.getHours()).padStart(2, "0");
+  const mm = String(d.getMinutes()).padStart(2, "0");
 
-    const dep = new Date(now.getTime() + inMin * 60000);
-    const hh = String(dep.getHours()).padStart(2, "0");
-    const mm = String(dep.getMinutes()).padStart(2, "0");
-
-    const r = rand(slot * 7.13 + line.offsetMin);
-    let state: Departure["state"] = "ontime";
-    let delayMin: number | undefined;
-    if (inMin <= 2) {
-      state = "boarding";
-    } else if (r < 0.06) {
-      state = "cancelled";
-    } else if (r < 0.28) {
-      state = "delay";
-      delayMin = 2 + Math.floor(rand(slot * 3.7) * 10); // +2..+11
-    }
-
-    const remark =
-      r > 0.72 ? REMARKS[Math.floor(rand(slot * 11.3) * REMARKS.length)] : undefined;
-
-    out.push({
-      time: `${hh}:${mm}`,
-      minutesAway: inMin,
-      train: line.train,
-      dest: line.dest,
-      destHref: DEST_HREF[line.dest],
-      platform: line.platform,
-      state,
-      delayMin,
-      remark,
-    });
+  const r = rand(sp.slot * 7.13 + sp.line.offsetMin);
+  let state: Departure["state"] = "ontime";
+  let delayMin: number | undefined;
+  if (r < 0.06) {
+    state = "cancelled";
+  } else if (r < 0.28) {
+    state = "delay";
+    delayMin = 2 + Math.floor(rand(sp.slot * 3.7) * 10); // +2..+11
   }
 
-  const sorted = out.sort((a, b) => a.minutesAway - b.minutesAway).slice(0, count);
-  // realism: exactly one train can be boarding - the earliest departure,
-  // and only when it is genuinely imminent. Everything else stays scheduled.
-  sorted.forEach((d, i) => {
-    if (d.state === "boarding" && !(i === 0 && d.minutesAway <= 2)) {
-      d.state = "ontime";
+  const remark =
+    r > 0.72 ? REMARKS[Math.floor(rand(sp.slot * 11.3) * REMARKS.length)] : undefined;
+
+  return {
+    id: `${sp.line.train}-${sp.slot}`,
+    time: `${hh}:${mm}`,
+    departsAtMs: sp.departsAtMs,
+    train: sp.line.train,
+    dest: sp.line.dest,
+    destHref: DEST_HREF[sp.line.dest],
+    platform: sp.line.platform,
+    state,
+    delayMin,
+    remark,
+  };
+}
+
+/** The queue in strict time order: keep taking whichever line departs
+ *  next until the page is full. */
+function fillBoard(afterMs: number): Departure[] {
+  const rows: Departure[] = [];
+  let cursor = afterMs;
+  let guard = 0;
+  while (rows.length < MAX_ROWS && guard++ < 200) {
+    let best: Spawn | null = null;
+    for (const line of LINES) {
+      const sp = nextSpawn(line, cursor);
+      if (!best || sp.departsAtMs < best.departsAtMs) best = sp;
     }
-  });
-  return sorted;
+    if (!best) break;
+    rows.push(materialize(best));
+    cursor = best.departsAtMs;
+  }
+  return rows;
+}
+
+export function initialBoard(now: Date): Departure[] {
+  return fillBoard(now.getTime());
+}
+
+export interface TickResult {
+  rows: Departure[];
+  changed: boolean;
+}
+
+/** One second of station time: rows that are due start lingering
+ *  (DEPARTED, or CANCELLED holding its slot), lingered rows leave, and
+ *  the tail refills. Returns the previous array untouched when nothing
+ *  happened, so the caller can skip re-renders. */
+export function tickBoard(prev: Departure[], now: Date): TickResult {
+  const t = now.getTime();
+  const rows: Departure[] = [];
+  let changed = false;
+
+  for (const row of prev) {
+    if (row.removalAt && t >= row.removalAt) {
+      changed = true;
+      continue; // left the station
+    }
+    if (!row.removalAt && t >= row.departsAtMs) {
+      changed = true;
+      rows.push({
+        ...row,
+        state: row.state === "cancelled" ? "cancelled" : "departed",
+        removalAt: t + LINGER_MS,
+      });
+      continue;
+    }
+    rows.push(row);
+  }
+
+  // refill the tail with whatever departs next, network-wide
+  let cursor = rows.length ? rows[rows.length - 1].departsAtMs : t;
+  let guard = 0;
+  while (rows.length < MAX_ROWS && guard++ < 100) {
+    let best: Spawn | null = null;
+    for (const line of LINES) {
+      const sp = nextSpawn(line, cursor);
+      if (!best || sp.departsAtMs < best.departsAtMs) best = sp;
+    }
+    if (!best) break;
+    rows.push(materialize(best));
+    cursor = best.departsAtMs;
+    changed = true;
+  }
+
+  return changed ? { rows, changed } : { rows: prev, changed };
 }

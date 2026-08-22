@@ -7,10 +7,10 @@
 // full-page scenes are mounted - old theme base, target colors riding the
 // wobbled rim (SVG displacement), target colors revealed inside the
 // growing circle from the orb. Everything crosses the arc together.
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useRef, useState, useLayoutEffect } from "preact/hooks";
 import { signal } from "@preact/signals";
 import { profiles, currentProfile, setProfile, type Profile } from "./theme";
-import { generateTimetable, type Departure } from "./timetable";
+import { initialBoard, tickBoard, type Departure } from "./timetable";
 import type { ComponentChildren } from "preact";
 
 const paused = signal(false);
@@ -23,11 +23,34 @@ const speedParam =
     : NaN;
 const WAVE_MS = Number.isFinite(speedParam) && speedParam >= 200 ? speedParam : 1000;
 
+// ?clock=seconds or ?clock=HH:MM[:SS] shifts station time - test hook
+// for watching departures without waiting for the real schedule
+const clockRaw =
+  typeof window !== "undefined"
+    ? new URLSearchParams(window.location.search).get("clock")
+    : null;
+const CLOCK_OFFSET = (() => {
+  if (!clockRaw) return 0;
+  if (clockRaw.includes(":")) {
+    const parts = clockRaw.split(":").map(Number);
+    const [h, m, s = 0] = parts;
+    const base = new Date();
+    const target = new Date(base);
+    target.setHours(h, m, s, 0);
+    return target.getTime() - base.getTime();
+  }
+  const secs = Number(clockRaw);
+  return Number.isFinite(secs) && secs !== 0 ? secs * 1000 : 0;
+})();
+function stationNow(): Date {
+  return new Date(Date.now() + CLOCK_OFFSET);
+}
+
 /** Isolated live clock: re-renders itself every second, nothing else. */
 function Clock() {
-  const [t, setT] = useState(() => new Date());
+  const [t, setT] = useState(stationNow);
   useEffect(() => {
-    const id = setInterval(() => setT(new Date()), 1000);
+    const id = setInterval(() => setT(stationNow()), 1000);
     return () => clearInterval(id);
   }, []);
   const hm = t.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
@@ -75,14 +98,20 @@ function wobbleScaleAt(t: number): number {
   return Math.max(0, WOBBLE_SCALE * (1 - (t - fadeStart) / (1 - fadeStart)));
 }
 
-function StatusCell({ d }: { d: Departure }) {
-  if (d.state === "boarding")
+function StatusCell({ d, boarding }: { d: Departure; boarding: boolean }) {
+  if (d.state === "departed")
+    return (
+      <span class="status dep">
+        <span class="mark" aria-hidden="true">▶ </span>DEPARTED
+      </span>
+    );
+  if (d.state === "cancelled") return <span class="status cxl">CANCELLED</span>;
+  if (boarding)
     return (
       <span class="status board">
         <span class="mark" aria-hidden="true">▌ </span>BOARDING
       </span>
     );
-  if (d.state === "cancelled") return <span class="status cxl">CANCELLED</span>;
   if (d.state === "delay")
     return <span class="status del">+{d.delayMin}</span>;
   return <span class="status ok">ON TIME</span>;
@@ -110,16 +139,46 @@ interface SwitchAnim {
 }
 
 export default function Board() {
-  // board re-renders only when the minute rolls - the per-second clock is
-  // isolated in <Clock/> so switching never triggers a full-board repaint
-  const [minuteDate, setMinuteDate] = useState(() => new Date());
+  // station time ticks every second; the queue advances with it
+  const [now, setNow] = useState(stationNow);
+  const [board, setBoard] = useState<Departure[]>(() => initialBoard(stationNow()));
+  const tbodyRef = useRef<HTMLTableSectionElement>(null);
+  const prevIdsRef = useRef<string[]>([]);
+
   useEffect(() => {
     const id = setInterval(() => {
-      const d = new Date();
-      setMinuteDate((prev) => (prev.getMinutes() === d.getMinutes() ? prev : d));
+      const t = stationNow();
+      setNow(t);
+      setBoard((prev) => tickBoard(prev, t).rows);
     }, 1000);
     return () => clearInterval(id);
   }, []);
+
+  // FLIP: when leading rows leave, hold the survivors at their old
+  // position for one frame, then glide them up into place
+  useLayoutEffect(() => {
+    const ids = board.map((d) => d.id);
+    const prev = prevIdsRef.current;
+    prevIdsRef.current = ids;
+    if (!prev.length || !tbodyRef.current) return;
+
+    let cut = 0;
+    while (cut < prev.length && !ids.includes(prev[cut])) cut++;
+    if (!cut) return;
+
+    const kids = Array.from(tbodyRef.current.children) as HTMLElement[];
+    const step = (kids[0]?.getBoundingClientRect().height ?? 41) * cut;
+    for (const el of kids) {
+      el.style.transition = "none";
+      el.style.transform = `translateY(${step}px)`;
+    }
+    requestAnimationFrame(() => {
+      for (const el of kids) {
+        el.style.transition = "transform 420ms cubic-bezier(0.22, 0.9, 0.36, 1)";
+        el.style.transform = "";
+      }
+    });
+  }, [board]);
 
   const orbRef = useRef<HTMLButtonElement>(null);
   const toRef = useRef<HTMLDivElement>(null);
@@ -227,11 +286,18 @@ export default function Board() {
     );
   }
 
-  const updated = minuteDate.toLocaleTimeString("de-DE", {
+  const updated = now.toLocaleTimeString("de-DE", {
     hour: "2-digit",
     minute: "2-digit",
   });
-  const rows = generateTimetable(minuteDate);
+  // boarding is a display state: only the front row, and only when it
+  // genuinely departs within the next two minutes
+  const front = board[0];
+  const frontBoards =
+    !!front &&
+    front.state !== "cancelled" &&
+    front.state !== "departed" &&
+    front.departsAtMs - now.getTime() <= 120_000;
   const cur = currentProfile();
 
   /** One complete page: hall + furniture + board. */
@@ -301,29 +367,38 @@ export default function Board() {
                 <th scope="col" class="remark-col">BEMERKUNG</th>
               </tr>
             </thead>
-            <tbody>
-              {rows.map((d) => (
-                <tr key={`${d.time}-${d.train}`} class={d.state === "boarding" ? "now" : ""}>
-                  <td class={d.state === "cancelled" ? "cxl" : ""}>
-                    <span>{d.time}</span>
-                  </td>
-                  <td>
-                    <span class={"badge b-" + d.train.replace(/\s+/g, "-").toLowerCase()}>
-                      {d.train}
-                    </span>
-                  </td>
-                  <td>
-                    <a href={d.destHref}>{d.dest}</a>
-                  </td>
-                  <td>
-                    <span>{d.platform}</span>
-                  </td>
-                  <td><StatusCell d={d} /></td>
-                  <td class="remark-col">
-                    <span>{d.remark ?? ""}</span>
-                  </td>
-                </tr>
-              ))}
+            <tbody ref={tbodyRef}>
+              {board.map((d, i) => {
+                const boarding = i === 0 && frontBoards;
+                const leaving =
+                  d.state === "departed" ||
+                  (d.state === "cancelled" && !!d.removalAt);
+                return (
+                  <tr
+                    key={d.id}
+                    class={leaving ? "gone" : boarding ? "now" : ""}
+                  >
+                    <td class={d.state === "cancelled" ? "cxl" : ""}>
+                      <span>{d.time}</span>
+                    </td>
+                    <td>
+                      <span class={"badge b-" + d.train.replace(/\s+/g, "-").toLowerCase()}>
+                        {d.train}
+                      </span>
+                    </td>
+                    <td>
+                      <a href={d.destHref}>{d.dest}</a>
+                    </td>
+                    <td>
+                      <span>{d.platform}</span>
+                    </td>
+                    <td><StatusCell d={d} boarding={boarding} /></td>
+                    <td class="remark-col">
+                      <span>{d.remark ?? ""}</span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 

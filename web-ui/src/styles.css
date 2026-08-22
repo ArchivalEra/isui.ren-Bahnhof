@@ -109,6 +109,13 @@ body {
 .board tbody tr:hover { background: color-mix(in srgb, var(--surface-dim) 55%, transparent); }
 .board tbody tr.now { background: rgba(180, 106, 0, 0.08); }
 .board tbody tr.now td:first-child { box-shadow: inset 3px 0 0 var(--signal-warn); }
+/* rows on their way out fade while the survivors glide up under them */
+.board tbody tr { will-change: transform; }
+.board tbody tr.gone,
+.board tbody tr.gone a {
+  opacity: 0.35;
+  transition: opacity 700ms ease;
+}
 
 .badge {
   display: inline-block;
@@ -130,6 +137,7 @@ body {
 .status.del { color: var(--signal-delay); font-weight: 700; }
 .status.cxl { color: var(--signal-delay); }
 .status.board { color: var(--signal-warn); font-weight: 700; }
+.status.dep { color: var(--on-surface-variant); font-weight: 700; letter-spacing: 0.08em; }
 .mark { animation: blink 1.2s steps(2, start) infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
 
@@ -201,9 +209,8 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
      layer paints its own theme - otherwise cells inherit from :root and
      every column flips only at commit instead of riding the wave */
   color: var(--on-surface);
-  /* the whole room is themed by this scene's tokens - walls included */
-  background:
-    radial-gradient(120% 90% at 50% 30%, var(--surface-dim) 0%, var(--surface-variant) 58%, var(--surface-container) 100%);
+  /* one flat wall: no grey-scale ramp, the room is a single honest tone */
+  background: var(--surface);
 }
 
 /* ---------- the HALL (station room around the board) ---------- */
@@ -219,7 +226,6 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   bottom: 0;
   height: 15vh;
   border-top: 1px solid var(--outline);
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.06) 100%);
 }
 .decor { position: absolute; opacity: 0.92; }
 .decor-bench { left: 11vw; bottom: 4vh; }
