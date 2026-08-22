@@ -347,6 +347,47 @@ export default function Board() {
             <path d="M31 94 H59 L54 116 Q45 121 36 116 Z" fill="var(--signal-warn)" />
             <rect x="29" y="91" width="32" height="7" rx="3" fill="var(--signal-warn)" />
           </svg>
+          {/* drinks vending machine */}
+          <svg class="decor decor-vending" viewBox="0 0 96 170" width="96" height="170">
+            <rect x="6" y="6" width="84" height="158" rx="4" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="2" />
+            <rect x="14" y="16" width="52" height="98" rx="2" fill="var(--surface-dim)" stroke="var(--outline)" />
+            {[0, 1, 2, 3].map((row) => (
+              <g key={row}>
+                <line x1="16" y1={40 + row * 25} x2="64" y2={40 + row * 25} stroke="var(--outline)" stroke-width="1.5" />
+                <rect x={20 + row * 11} y={22 + row * 25} width="7" height="15" rx="2" fill={row % 2 ? "var(--signal-delay)" : "var(--signal-ok)"} opacity=".8" />
+                <rect x={44 - row * 6} y={22 + row * 25} width="7" height="15" rx="2" fill="var(--signal-warn)" opacity=".65" />
+              </g>
+            ))}
+            <rect x="72" y="20" width="12" height="60" rx="2" fill="var(--surface)" stroke="var(--outline)" stroke-width="1.5" />
+            <circle cx="78" cy="30" r="3" fill="var(--signal-ok)" />
+            <rect x="74" y="40" width="8" height="26" rx="1" fill="var(--outline)" opacity=".5" />
+            <rect x="14" y="122" width="52" height="30" rx="2" fill="var(--surface)" stroke="var(--outline)" stroke-width="1.5" />
+            <text x="40" y="142" text-anchor="middle" font-size="9" letter-spacing="2" fill="var(--on-surface-variant)">PULL</text>
+            <rect x="6" y="164" width="84" height="4" rx="2" fill="var(--outline)" opacity=".6" />
+          </svg>
+          {/* baggage security scanner */}
+          <svg class="decor decor-security" viewBox="0 0 210 110" width="210" height="110">
+            <rect x="10" y="86" width="190" height="8" rx="3" fill="var(--outline)" opacity=".55" />
+            {[24, 58, 92, 126, 160, 188].map((x) => (
+              <circle key={x} cx={x} cy="90" r="5" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="1.5" />
+            ))}
+            <path d="M70 22 H140 L152 66 H58 Z" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="2" />
+            <rect x="62" y="18" width="86" height="10" rx="3" fill="var(--outline)" opacity=".7" />
+            <rect x="74" y="30" width="62" height="28" rx="2" fill="var(--surface-dim)" stroke="var(--outline)" />
+            <rect x="80" y="36" width="50" height="16" rx="1" fill="var(--signal-warn)" opacity=".35" />
+            {[68, 144].map((x) => (
+              <rect key={x} x={x} y="26" width="8" height="44" rx="2" fill="var(--outline)" opacity=".75" />
+            ))}
+            <rect x="156" y="34" width="44" height="42" rx="3" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="2" />
+            <rect x="162" y="40" width="26" height="18" rx="2" fill="var(--surface-dim)" stroke="var(--outline)" />
+            <circle cx="186" cy="49" r="4" fill="var(--signal-ok)" />
+            {[162, 172, 182].map((x, i) => (
+              <circle key={x} cx={x + 4} cy="66" r="3" fill={["var(--signal-ok)", "var(--signal-warn)", "var(--signal-delay)"][i]} />
+            ))}
+            <rect x="176" y="60" width="18" height="12" rx="2" fill="var(--outline)" opacity=".4" />
+            <rect x="10" y="30" width="44" height="26" rx="3" fill="var(--surface-dim)" stroke="var(--outline)" stroke-width="1.5" opacity=".85" />
+            <path d="M20 48 l10 -12 l8 6 l9 -10" fill="none" stroke="var(--on-surface-variant)" stroke-width="2" opacity=".6" />
+          </svg>
         </div>
         <div class="wrap">
           <header class="head">

@@ -171,7 +171,7 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   width: 100%;
   background: transparent;
   border: none;
-  border-bottom: 1px solid color-mix(in srgb, var(--outline) 45%, transparent);
+  border-bottom: 1px solid transparent;
   border-radius: 0;
   color: var(--on-surface);
   font: inherit;
@@ -182,14 +182,16 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   caret-color: var(--signal-warn);
   transition: border-color 0.35s ease;
 }
+/* invisible at rest - the placeholder is the only hint; the hairline
+   surfaces only while you are actually in there */
 .board-search-input::placeholder {
   color: var(--on-surface-variant);
-  opacity: 0.7;
+  opacity: 0.55;
   letter-spacing: 0.14em;
 }
 .board-search-input:focus-visible,
 .board-search-input:focus {
-  border-bottom-color: var(--signal-warn);
+  border-bottom-color: color-mix(in srgb, var(--signal-warn) 60%, transparent);
 }
 .board-search-input::-webkit-search-cancel-button {
   -webkit-appearance: none;
@@ -279,8 +281,12 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
 .decor-bench { left: 11vw; bottom: 4vh; }
 .decor-plant-r { right: 9vw; bottom: 3.5vh; }
 .decor-plant-l { left: 3vw; bottom: 3vh; }
+.decor-vending { right: 26vw; bottom: 3.5vh; }
+.decor-security { left: 27vw; bottom: 2.8vh; }
 @media (max-width: 900px) {
   .decor-bench { left: 2vw; width: 150px; }
   .decor-plant-r { right: 2vw; width: 90px; height: 128px; }
   .decor-plant-l { display: none; }
+  .decor-vending { right: 4vw; width: 64px; height: 114px; }
+  .decor-security { display: none; }
 }
