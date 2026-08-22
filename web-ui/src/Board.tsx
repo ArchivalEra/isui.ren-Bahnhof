@@ -53,7 +53,9 @@ function Clock() {
     const id = setInterval(() => setT(stationNow()), 1000);
     return () => clearInterval(id);
   }, []);
-  const hm = t.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  // visitor's own timezone AND locale: a New Yorker reads 5:41 PM, a
+  // Berliner reads 17:41 - both match what their desktop shows
+  const hm = t.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   const sec = String(t.getSeconds()).padStart(2, "0");
   return (
     <span class="clock" aria-label={`Current time ${hm}:${sec}`}>
@@ -286,10 +288,7 @@ export default function Board() {
     );
   }
 
-  const updated = now.toLocaleTimeString("de-DE", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const updated = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   // boarding is a display state: only the front row, and only when it
   // genuinely departs within the next two minutes
   const front = board[0];

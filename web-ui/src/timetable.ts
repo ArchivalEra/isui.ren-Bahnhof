@@ -85,9 +85,11 @@ function nextSpawn(line: Line, tMs: number): Spawn {
 }
 
 function materialize(sp: Spawn): Departure {
+  // scheduled HH:MM in the VISITOR's timezone and locale - a departure
+  // at the same instant reads 17:44 in Berlin and 5:44 PM in New York,
+  // each matching what their desktop clock shows
   const d = new Date(sp.departsAtMs);
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
+  const hhmm = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
   const r = rand(sp.slot * 7.13 + sp.line.offsetMin);
   let state: Departure["state"] = "ontime";
@@ -113,7 +115,7 @@ function materialize(sp: Spawn): Departure {
 
   return {
     id: `${sp.line.train}-${sp.slot}`,
-    time: `${hh}:${mm}`,
+    time: hhmm,
     departsAtMs: sp.departsAtMs,
     train: sp.line.train,
     dest: sp.line.dest,

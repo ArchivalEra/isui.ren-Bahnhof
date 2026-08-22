@@ -132,7 +132,8 @@ a:hover { border-bottom-color: var(--delay); }
 <script>
   const el = document.getElementById("clock");
   const tick = () => {
-    el.textContent = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    // visitor's own timezone and locale - matches their desktop clock
+    el.textContent = new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   };
   tick();
   setInterval(tick, 1000);
