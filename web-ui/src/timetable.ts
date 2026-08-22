@@ -62,6 +62,10 @@ export interface Departure {
   state: "ontime" | "delay" | "cancelled" | "departed";
   delayMin?: number;
   remark?: string;
+  /** live cancellation: the moment this train turns CANCELLED out of the
+   *  blue, somewhere 30-90s before departure. Set only for trains whose
+   *  fate is a last-minute failure; absent for healthy ones. */
+  cancelAtMs?: number;
   /** set when due: the moment this row should vanish */
   removalAt?: number;
 }
@@ -98,6 +102,15 @@ function materialize(sp: Spawn): Departure {
   const remark =
     r > 0.72 ? REMARKS[Math.floor(rand(sp.slot * 11.3) * REMARKS.length)] : undefined;
 
+  // live cancellation: healthy-looking trains can fail last-minute. The
+  // failure moment is baked in per slot (deterministic), so the same
+  // train always fails at the same point of its life - it just looks
+  // spontaneous to anyone watching.
+  let cancelAtMs: number | undefined;
+  if (state !== "cancelled" && rand(sp.slot * 5.31 + sp.line.offsetMin * 1.7) < 0.05) {
+    cancelAtMs = sp.departsAtMs - (30_000 + Math.floor(rand(sp.slot * 9.77) * 60_000));
+  }
+
   return {
     id: `${sp.line.train}-${sp.slot}`,
     time: `${hh}:${mm}`,
@@ -109,6 +122,7 @@ function materialize(sp: Spawn): Departure {
     state,
     delayMin,
     remark,
+    cancelAtMs,
   };
 }
 
@@ -132,7 +146,14 @@ function fillBoard(afterMs: number): Departure[] {
 }
 
 export function initialBoard(now: Date): Departure[] {
-  return fillBoard(now.getTime());
+  const t = now.getTime();
+  // trains whose failure moment already passed while the page was closed
+  // load as cancelled - no fake ON TIME flash on first paint
+  return fillBoard(t).map((r) =>
+    r.cancelAtMs && r.cancelAtMs <= t && r.state !== "cancelled"
+      ? { ...r, state: "cancelled", delayMin: undefined }
+      : r,
+  );
 }
 
 export interface TickResult {
@@ -153,6 +174,17 @@ export function tickBoard(prev: Departure[], now: Date): TickResult {
     if (row.removalAt && t >= row.removalAt) {
       changed = true;
       continue; // left the station
+    }
+    if (
+      !row.removalAt &&
+      row.state !== "cancelled" &&
+      row.cancelAtMs &&
+      t >= row.cancelAtMs
+    ) {
+      // live failure: the train goes CANCELLED on the spot, mid-boarding
+      changed = true;
+      rows.push({ ...row, state: "cancelled", delayMin: undefined });
+      continue;
     }
     if (!row.removalAt && t >= row.departsAtMs) {
       changed = true;
