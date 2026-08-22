@@ -3,26 +3,32 @@
 // depart when due, linger briefly, leave, and the tail refills in strict
 // time order. All randomness is deterministic per schedule slot, so the
 // same train is always the same train.
+//
+// Destinations are NOT maintained here: they are discovered at build
+// time from the live site tree (destinations.generated.ts). Train
+// numbers stay fictional forever.
 
-export type Dest = "home" | "blog" | "song-wall";
+import { DESTINATIONS } from "./destinations.generated";
+
+export type Dest = string; // a destination slug discovered at build time
 
 interface Line {
   train: string;
-  dest: Dest;
+  destSlot: number; // index into DESTINATIONS (wraps around)
   platform: string;
   cycleMin: number; // minutes between departures
   offsetMin: number; // phase within the hour-grid
 }
 
 const LINES: Line[] = [
-  { train: "S 3", dest: "song-wall", platform: "3", cycleMin: 20, offsetMin: 4 },
-  { train: "RE 7", dest: "home", platform: "1", cycleMin: 30, offsetMin: 9 },
-  { train: "IC 221", dest: "blog", platform: "2", cycleMin: 60, offsetMin: 14 },
-  { train: "RB 12", dest: "blog", platform: "2", cycleMin: 30, offsetMin: 19 },
-  { train: "RE 4", dest: "home", platform: "1", cycleMin: 60, offsetMin: 24 },
-  { train: "IC 44", dest: "song-wall", platform: "3", cycleMin: 120, offsetMin: 31 },
-  { train: "S 9", dest: "song-wall", platform: "3", cycleMin: 20, offsetMin: 46 },
-  { train: "RE 2", dest: "home", platform: "1", cycleMin: 30, offsetMin: 49 },
+  { train: "S 3", destSlot: 0, platform: "3", cycleMin: 20, offsetMin: 4 },
+  { train: "RE 7", destSlot: 1, platform: "1", cycleMin: 30, offsetMin: 9 },
+  { train: "IC 221", destSlot: 2, platform: "2", cycleMin: 60, offsetMin: 14 },
+  { train: "RB 12", destSlot: 3, platform: "2", cycleMin: 30, offsetMin: 19 },
+  { train: "RE 4", destSlot: 4, platform: "1", cycleMin: 60, offsetMin: 24 },
+  { train: "IC 44", destSlot: 5, platform: "3", cycleMin: 120, offsetMin: 31 },
+  { train: "S 9", destSlot: 6, platform: "3", cycleMin: 20, offsetMin: 44 },
+  { train: "RE 2", destSlot: 7, platform: "1", cycleMin: 30, offsetMin: 49 },
 ];
 
 const REMARKS = [
@@ -34,11 +40,13 @@ const REMARKS = [
   "Kinderwagen",
 ];
 
-const DEST_HREF: Record<Dest, string> = {
-  home: "/heart",
-  blog: "/Bahnhof/blog",
-  "song-wall": "/Bahnhof/song-wall",
-};
+/** Wrap-around destination lookup: 8 fictional lines fan out across
+ *  however many real pages the build discovered (today: just Heart). */
+function destOf(line: Line): { label: string; href: string } {
+  const n = Math.max(1, DESTINATIONS.length);
+  const d = DESTINATIONS[line.destSlot % n];
+  return d ?? { label: "Heart", href: "/heart/" };
+}
 
 export const MAX_ROWS = 12;
 /** How long a DEPARTED / due-CANCELLED row stays before it leaves. */
@@ -55,7 +63,7 @@ export interface Departure {
   time: string; // scheduled HH:MM
   departsAtMs: number;
   train: string;
-  dest: Dest;
+  dest: string; // display label (Nach column)
   destHref: string;
   platform: string;
   /** spawn-time fate; the runtime overlays boarding/departed on top */
@@ -118,8 +126,8 @@ function materialize(sp: Spawn): Departure {
     time: hhmm,
     departsAtMs: sp.departsAtMs,
     train: sp.line.train,
-    dest: sp.line.dest,
-    destHref: DEST_HREF[sp.line.dest],
+    dest: destOf(sp.line).label,
+    destHref: destOf(sp.line).href,
     platform: sp.line.platform,
     state,
     delayMin,

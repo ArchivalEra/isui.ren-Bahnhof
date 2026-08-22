@@ -24,9 +24,18 @@ body {
 }
 
 .wrap {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 2rem 1rem 3rem;
+  /* a window of fixed width, centered by the stage grid */
+  width: min(960px, calc(100vw - 2rem));
+  padding-inline: 1rem;
+}
+
+/* window-on-the-wall layout (heart's window-stage lesson, native edition):
+   the scene is a grid stage and the board sits dead center at any
+   viewport; `safe` keeps tall content scrollable on small screens */
+.scene-body {
+  display: grid;
+  place-items: safe center;
+  padding-block: clamp(2rem, 6vh, 4rem);
 }
 
 .head {
@@ -204,6 +213,10 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
 .scene-body {
   position: relative;
   min-height: 100vh;
+  display: grid;
+  /* the browser lays the stage out; `safe` center keeps tall boards
+     scrollable on small screens instead of clipping them */
+  place-items: safe center;
   overflow: hidden;
   /* resolve inherited text color HERE, inside the scene, so each stacked
      layer paints its own theme - otherwise cells inherit from :root and

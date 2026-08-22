@@ -1,0 +1,16 @@
+# Bahnhof board blacklist - one glob per line.
+# Consumed at BUILD time only: the matcher filters the discovered
+# destination list before anything is generated, so these rules and
+# even their existence never reach the browser (nothing to find in F12).
+#
+# Patterns are matched against:
+#   - the bare page slug            e.g.  drafts
+#   - its host+path forms           e.g.  isui.ren/drafts , isui.ren/drafts/*
+# Raw domain-wildcard patterns are also legal and simply never match a
+# bare-slug candidate (kept for future subdomain-shaped destinations):
+#   *.global.isui.ren
+#
+# Examples (uncomment to activate):
+# isui.ren/test/*
+# drafts
+# *.global.isui.ren

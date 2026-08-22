@@ -25,6 +25,16 @@ jobs:
           cache: npm
           cache-dependency-path: web-ui/package-lock.json
 
+      - name: Discover live destinations (build-time board hook)
+        run: |
+          # Every site repo ships its build to the heart deploy branch.
+          # Scan its live page dirs, filter through the blacklist, and
+          # generate the destination module - the blacklist itself never
+          # reaches the browser bundle.
+          git clone --depth 1 --branch deploy https://github.com/ArchivalEra/isui.ren-heart.git /tmp/deploy-ref 2>&1 | tail -2
+          cd web-ui
+          node scripts/gen-destinations.mjs /tmp/deploy-ref board.blacklist src/destinations.generated.ts
+
       - name: Build Bahnhof
         run: |
           cd web-ui

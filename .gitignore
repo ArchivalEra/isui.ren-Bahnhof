@@ -53,5 +53,8 @@
 # Security scanner reports (local artifacts, never shipped)
 web-ui/.mimosa/
 
+# Generated at build time by web-ui/scripts/gen-destinations.mjs
+web-ui/src/destinations.generated.ts
+
 # Site-wide 404 page (deployed to the heart deploy root by CI)
 !404.html
