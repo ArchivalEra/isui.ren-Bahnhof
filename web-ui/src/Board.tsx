@@ -16,7 +16,12 @@ import type { ComponentChildren } from "preact";
 const paused = signal(false);
 
 const BAND_W = 240; // rim water width, px
-const WAVE_MS = 1000;
+// ?wavespeed=ms overrides sweep duration - demo/test hook
+const speedParam =
+  typeof window !== "undefined"
+    ? Number(new URLSearchParams(window.location.search).get("wavespeed"))
+    : NaN;
+const WAVE_MS = Number.isFinite(speedParam) && speedParam >= 200 ? speedParam : 1000;
 
 /** Isolated live clock: re-renders itself every second, nothing else. */
 function Clock() {
