@@ -76,9 +76,8 @@ body {
 .sec { font-size: 0.85rem; color: var(--on-surface-variant); }
 
 /* the board itself — a real table.
-   DECoupled: no fill, no frame of its own. The board is pure typography -
-   lines and letters carry the color directly on the room's backdrop, so a
-   glow can never be cut by a panel edge again. */
+   DEcoupled: no fill, no frame of its own. The board is pure typography -
+   lines and letters carry the color directly on the room's backdrop. */
 .board {
   width: 100%;
   border-collapse: collapse;
@@ -230,50 +229,4 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   .decor-bench { left: 2vw; width: 150px; }
   .decor-plant-r { right: 2vw; width: 90px; height: 128px; }
   .decor-plant-l { display: none; }
-}
-
-/* ---------- night TV glow: an independent light layer, NOT a panel style.
-   It lives behind the content and is bounded only by its own gradient, so
-   no rectangle can ever slice it. Dark profiles light the room; heart
-   stays clean paper. */
-.wrap {
-  position: relative;
-  z-index: 1;
-}
-.screen-glow {
-  position: absolute;
-  left: 50%;
-  top: 6vh;
-  width: min(76vw, 980px);
-  height: 52vh;
-  transform: translateX(-50%);
-  background:
-    radial-gradient(50% 40% at 50% 32%, rgba(154, 190, 255, 0.20) 0%, rgba(110, 150, 230, 0.08) 55%, transparent 78%);
-  filter: blur(26px);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 1.2s ease;
-}
-html[data-glow="heart-dark"] .screen-glow,
-html[data-glow="station"] .screen-glow {
-  opacity: 1;
-  animation: screen-breathe 7s ease-in-out infinite alternate;
-}
-@keyframes screen-breathe {
-  from { filter: blur(26px) brightness(0.94); }
-  to { filter: blur(26px) brightness(1.06); }
-}
-/* the lit screen pools a little light on the floor - gradient-bounded,
-   so it fades out inside the strip instead of stopping at an edge */
-html[data-glow="heart-dark"] .decor-floor,
-html[data-glow="station"] .decor-floor {
-  background:
-    radial-gradient(42% 160% at 50% 0%, rgba(140, 170, 235, 0.16) 0%, rgba(140, 170, 235, 0.04) 55%, transparent 85%),
-    linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.06) 100%);
-}
-@media (prefers-reduced-motion: reduce) {
-  html[data-glow="heart-dark"] .screen-glow,
-  html[data-glow="station"] .screen-glow {
-    animation: none;
-  }
 }

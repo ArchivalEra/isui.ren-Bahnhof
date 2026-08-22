@@ -9,7 +9,7 @@
 // growing circle from the orb. Everything crosses the arc together.
 import { useEffect, useRef, useState } from "preact/hooks";
 import { signal } from "@preact/signals";
-import { profiles, currentProfile, setProfile, applyGlow, type Profile } from "./theme";
+import { profiles, currentProfile, setProfile, type Profile } from "./theme";
 import { generateTimetable, type Departure } from "./timetable";
 import type { ComponentChildren } from "preact";
 
@@ -158,10 +158,6 @@ export default function Board() {
         return;
       }
 
-      // the room's TV glow lags behind: it keeps the old profile while the
-      // wave sweeps, and settles into the new one only after full cover
-      document.documentElement.dataset.glow = from.id;
-
       ensureWobbleFilter();
       const { x: cx, y: cy } = orbOrigin();
       setAnim({ from, to, cx, cy });
@@ -182,7 +178,6 @@ export default function Board() {
       // completes and the layers always collapse - a stuck mid-state is
       // the one failure mode this UI must never show
       const commit = () => {
-        applyGlow(to.id);
         setProfile(to.id);
         setAnim(null);
       };
@@ -277,9 +272,6 @@ export default function Board() {
             <rect x="29" y="91" width="32" height="7" rx="3" fill="var(--signal-warn)" />
           </svg>
         </div>
-        {/* room light: an independent glow behind the content - no panel
-            owns it, so nothing can slice it */}
-        <div class="screen-glow" aria-hidden="true" />
         <div class="wrap">
           <header class="head">
             <h1>ISUI.REN — HAUPTBAHNHOF</h1>
