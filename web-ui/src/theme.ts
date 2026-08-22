@@ -102,9 +102,16 @@ function applyProfile(): void {
   document.documentElement.style.colorScheme = p.dark ? "dark" : "light";
 }
 
+/** Glow styling keys off this attribute - it flips LATE so the glow rides
+ *  behind the wave instead of jumping at the start. */
+export function applyGlow(id: string): void {
+  document.documentElement.dataset.glow = id;
+}
+
 /** Re-applies tokens reactively: profile switches take effect instantly. */
 export function initTheme(): void {
   effect(applyProfile);
+  applyGlow(currentId.value);
   // follow system preference only while the user has not made an explicit choice
   window
     .matchMedia("(prefers-color-scheme: dark)")
@@ -115,6 +122,9 @@ export function initTheme(): void {
       } catch {
         /* storage unavailable */
       }
-      if (!saved) currentId.value = systemPreference();
+      if (!saved) {
+        currentId.value = systemPreference();
+        applyGlow(currentId.value);
+      }
     });
 }

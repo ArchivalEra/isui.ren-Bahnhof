@@ -211,8 +211,9 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
 }
 
 /* ---------- night TV glow: dark profiles only, heart stays clean ---------- */
-html[data-profile="heart-dark"] .board,
-html[data-profile="station"] .board {
+html[data-glow="heart-dark"] .board,
+html[data-glow="station"] .board {
+  border-color: transparent; /* a lit screen has no hard bezel line */
   box-shadow:
     0 0 18px rgba(154, 190, 255, 0.30),
     0 0 70px rgba(110, 150, 230, 0.22),
@@ -220,8 +221,8 @@ html[data-profile="station"] .board {
     0 24px 60px rgba(0, 0, 0, 0.5);
   animation: screen-breathe 7s ease-in-out infinite alternate;
 }
-html[data-profile="heart-dark"] .hall::after,
-html[data-profile="station"] .hall::after {
+html[data-glow="heart-dark"] .hall::after,
+html[data-glow="station"] .hall::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -242,8 +243,8 @@ html[data-profile="station"] .hall::after {
   to { filter: brightness(1.02); }
 }
 @media (prefers-reduced-motion: reduce) {
-  html[data-profile="heart-dark"] .board,
-  html[data-profile="station"] .board {
+  html[data-glow="heart-dark"] .board,
+  html[data-glow="station"] .board {
     animation: none;
   }
 }

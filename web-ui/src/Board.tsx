@@ -9,7 +9,7 @@
 // growing circle from the orb. Everything crosses the arc together.
 import { useEffect, useRef, useState } from "preact/hooks";
 import { signal } from "@preact/signals";
-import { profiles, currentProfile, setProfile, type Profile } from "./theme";
+import { profiles, currentProfile, setProfile, applyGlow, type Profile } from "./theme";
 import { generateTimetable, type Departure } from "./timetable";
 import type { ComponentChildren } from "preact";
 
@@ -134,6 +134,10 @@ export default function Board() {
         return;
       }
 
+      // the room's TV glow lags behind: it keeps the old profile while the
+      // wave sweeps, and settles into the new one only after full cover
+      document.documentElement.dataset.glow = from.id;
+
       ensureWobbleFilter();
       const { x: cx, y: cy } = orbOrigin();
       setAnim({ from, to, cx, cy });
@@ -165,7 +169,9 @@ export default function Board() {
         requestAnimationFrame(frame);
       });
 
-      // commit: :root tokens + orb + storage; collapse is same-color
+      // commit: :root tokens + orb + storage; collapse is same-color.
+      // the glow catches up to the new theme only now
+      applyGlow(to.id);
       setProfile(to.id);
       setAnim(null);
     } finally {
