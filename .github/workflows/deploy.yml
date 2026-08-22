@@ -58,12 +58,15 @@ jobs:
           git clone --branch deploy --depth 1 git@github.com:ArchivalEra/isui.ren-heart.git /tmp/heart-deploy 2>&1 | tail -5
 
           # Replace only Bahnhof/ inside deploy; heart's root stays intact.
+          # The station also owns the site-wide 404 page at the deploy root
+          # (EdgeOne serves it for any dead path once the SPA rewrite is off).
           rm -rf /tmp/heart-deploy/Bahnhof
           mkdir -p /tmp/heart-deploy/Bahnhof
           cp -r web-ui/dist/* /tmp/heart-deploy/Bahnhof/
+          cp 404.html /tmp/heart-deploy/404.html
 
           cd /tmp/heart-deploy
-          git add Bahnhof
+          git add Bahnhof 404.html
           if git diff --cached --quiet; then
             echo "No changes in Bahnhof dist; nothing to push."
             exit 0

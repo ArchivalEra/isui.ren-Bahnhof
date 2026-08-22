@@ -49,3 +49,6 @@
 
 # Bahnhof production site (winner: B — live departure board)
 !web-ui/**
+
+# Site-wide 404 page (deployed to the heart deploy root by CI)
+!404.html

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>404 — IM BAHNHOF</title>
+<style>
+:root {
+  --surface: #ffffff;
+  --surface-dim: #fafafa;
+  --outline: #d9d9d9;
+  --ink: #111111;
+  --variant: #4d4d4d;
+  --delay: #e30613;
+  --warn: #b46a00;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #111111;
+    --surface-dim: #1a1a1a;
+    --outline: #333333;
+    --ink: #f2efe7;
+    --variant: #a9b2c4;
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--surface);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.panel { width: min(720px, 100%); }
+.head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+h1 { font-size: 1rem; font-weight: 800; letter-spacing: 0.28em; }
+.clock { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.08em; }
+.big {
+  font-size: clamp(4rem, 16vw, 7.5rem);
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 1.2rem 0 0.9rem;
+  border-bottom: 2px solid var(--outline);
+}
+table { width: 100%; border-collapse: collapse; margin-top: 0.9rem; }
+th, td {
+  text-align: left;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--outline) 45%, transparent);
+  font-size: 0.95rem;
+}
+th {
+  font-size: 0.65rem;
+  letter-spacing: 0.22em;
+  color: var(--variant);
+  border-bottom: 2px solid color-mix(in srgb, var(--outline) 70%, transparent);
+}
+th + th, td + td { border-left: 1px solid color-mix(in srgb, var(--outline) 32%, transparent); }
+.status { color: var(--delay); font-weight: 700; letter-spacing: 0.08em; }
+.sub { display: block; font-size: 0.72rem; font-weight: 400; color: var(--variant); margin-top: 0.3rem; letter-spacing: 0.02em; }
+.dest { font-weight: 700; }
+.foot {
+  margin-top: 1rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  color: var(--variant);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+a {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 2px solid var(--warn);
+  padding-bottom: 2px;
+}
+a:hover { border-bottom-color: var(--delay); }
+@media (max-width: 640px) { .hidewide { display: none; } }
+</style>
+</head>
+<body>
+<main class="panel">
+  <div class="head">
+    <h1>ISUI.REN — HAUPTBAHNHOF</h1>
+    <span class="clock" id="clock">--:--</span>
+  </div>
+
+  <div class="big">404</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">ZUG</th>
+        <th scope="col">NACH</th>
+        <th scope="col" class="hidewide">GLEIS</th>
+        <th scope="col">STATUS</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>— — —</td>
+        <td class="dest">Nirgendwo
+          <span class="sub">this platform does not exist</span>
+        </td>
+        <td class="hidewide">—</td>
+        <td><span class="status">CANCELLED</span>
+          <span class="sub">not found im bahnhof · seite nicht gefunden</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="foot">
+    <span>AKTUALISIERT LIVE · SOLL/IST</span>
+    <a href="/Bahnhof/">ZURÜCK IM BAHNHOF →</a>
+  </div>
+</main>
+<script>
+  const el = document.getElementById("clock");
+  const tick = () => {
+    el.textContent = new Date().toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  };
+  tick();
+  setInterval(tick, 1000);
+</script>
+</body>
+</html>
