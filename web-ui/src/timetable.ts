@@ -35,7 +35,7 @@ const REMARKS = [
 ];
 
 const DEST_HREF: Record<Dest, string> = {
-  home: "/",
+  home: "/heart",
   blog: "/Bahnhof/blog",
   "song-wall": "/Bahnhof/song-wall",
 };
