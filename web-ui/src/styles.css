@@ -180,14 +180,15 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   position: relative;
   min-height: 100vh;
   overflow: hidden;
+  /* the whole room is themed by this scene's tokens - walls included */
+  background:
+    radial-gradient(120% 90% at 50% 30%, var(--surface-dim) 0%, var(--surface-variant) 58%, var(--surface-container) 100%);
 }
 
 /* ---------- the HALL (station room around the board) ---------- */
 .hall {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  background:
-    radial-gradient(120% 90% at 50% 30%, var(--surface-dim) 0%, var(--surface-variant) 58%, var(--surface-container) 100%);
   overflow: hidden;
 }
 .decor-floor {
