@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState, useLayoutEffect } from "preact/hooks";
 import { signal } from "@preact/signals";
 import { profiles, currentProfile, setProfile, type Profile } from "./theme";
-import { initialBoard, tickBoard, type Departure } from "./timetable";
+import { initialBoard, tickBoard, type Departure, type ScheduleMem } from "./timetable";
 import type { ComponentChildren } from "preact";
 
 const paused = signal(false);
@@ -143,15 +143,26 @@ interface SwitchAnim {
 export default function Board() {
   // station time ticks every second; the queue advances with it
   const [now, setNow] = useState(stationNow);
-  const [board, setBoard] = useState<Departure[]>(() => initialBoard(stationNow()));
+  // boot once: initial rows + the scheduler's per-destination memory
+  const bootRef = useRef<{ rows: Departure[]; mem: ScheduleMem } | null>(null);
+  if (!bootRef.current) bootRef.current = initialBoard(stationNow());
+  const [board, setBoard] = useState<Departure[]>(bootRef.current.rows);
+  const memRef = useRef<ScheduleMem>(bootRef.current.mem);
   const tbodyRef = useRef<HTMLTableSectionElement>(null);
   const prevIdsRef = useRef<string[]>([]);
+  // search-as-index: the input is live UI first, the index system plugs
+  // into `query` later
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const id = setInterval(() => {
       const t = stationNow();
       setNow(t);
-      setBoard((prev) => tickBoard(prev, t).rows);
+      setBoard((prev) => {
+        const r = tickBoard(prev, t, memRef.current);
+        memRef.current = r.mem;
+        return r.rows;
+      });
     }, 1000);
     return () => clearInterval(id);
   }, []);
@@ -401,7 +412,21 @@ export default function Board() {
             </tbody>
           </table>
 
-          <footer class="foot">AKTUALISIERT {updated} · SOLL/IST · LIVE</footer>
+          <footer class="foot">
+            AKTUALISIERT {updated} · SOLL/IST · LIVE
+            <form class="board-search" onSubmit={(e) => e.preventDefault()}>
+              <input
+                type="search"
+                class="board-search-input"
+                placeholder="SUCHE — search the timetable"
+                aria-label="Search the departure board"
+                autoComplete="off"
+                spellcheck={false}
+                value={query}
+                onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+              />
+            </form>
+          </footer>
         </div>
       </div>
     );

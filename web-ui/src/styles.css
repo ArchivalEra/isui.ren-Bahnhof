@@ -160,6 +160,41 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   text-align: right;
 }
 
+/* ---------- search-as-index (pure transparency, index plugs in later) ----------
+   The input is a stable citizen of the layout: rows appearing or leaving
+   above it change the board's size, never the input's geometry, focus,
+   or IME composition. */
+.board-search {
+  margin-top: 1rem;
+}
+.board-search-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid color-mix(in srgb, var(--outline) 45%, transparent);
+  border-radius: 0;
+  color: var(--on-surface);
+  font: inherit;
+  font-size: 0.9rem;
+  letter-spacing: 0.06em;
+  padding: 0.45rem 0.15rem;
+  outline: none;
+  caret-color: var(--signal-warn);
+  transition: border-color 0.35s ease;
+}
+.board-search-input::placeholder {
+  color: var(--on-surface-variant);
+  opacity: 0.7;
+  letter-spacing: 0.14em;
+}
+.board-search-input:focus-visible,
+.board-search-input:focus {
+  border-bottom-color: var(--signal-warn);
+}
+.board-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+}
+
 @media (max-width: 640px) {
   .remark-col { display: none; }
   .wrap { padding: 1rem 0.6rem 2rem; }
