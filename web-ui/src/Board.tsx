@@ -2,25 +2,21 @@
 // Timetable is generated from the real clock (timetable.ts); a native
 // <table> lays out the columns.
 //
-// Theme switching is a RADIAL WATER WAVE from the orb. Three stacked
-// copies of the board are mounted for ~1s:
-//   base  - old theme, everything outside the wave
-//   band  - target colors + SVG displacement filter: text passing through
-//           the rim refracts like it is under a convex water surface
-//   inner - target colors, revealed inside the growing circle
-// clip-path circles expand from the click point via rAF (refs only - no
-// re-renders during the animation). When the wave covers the viewport the
-// profile is committed and the extra layers collapse seamlessly: the
-// remaining layer is pixel-identical to the single-page render.
+// Theme switching floods the WHOLE PAGE: the station hall (walls, floor,
+// furniture) plus the board are one "scene". During a switch three stacked
+// full-page scenes are mounted - old theme base, target colors riding the
+// wobbled rim (SVG displacement), target colors revealed inside the
+// growing circle from the orb. Everything crosses the arc together.
 import { useEffect, useRef, useState } from "preact/hooks";
 import { signal } from "@preact/signals";
 import { profiles, currentProfile, setProfile, type Profile } from "./theme";
 import { generateTimetable, type Departure } from "./timetable";
+import type { ComponentChildren } from "preact";
 
 const paused = signal(false);
 
-const BAND_W = 220; // rim water width, px
-const WAVE_MS = 950;
+const BAND_W = 240; // rim water width, px
+const WAVE_MS = 1000;
 
 /** Isolated live clock: re-renders itself every second, nothing else. */
 function Clock() {
@@ -42,7 +38,7 @@ function Clock() {
 }
 
 let wobbleDefsReady = false;
-/** Inject (once) the turbulence+displacement filter used by the band. */
+/** Inject (once) the turbulence+displacement filter used by the rim. */
 function ensureWobbleFilter(): string {
   const id = "bahnhof-float";
   if (wobbleDefsReady || document.getElementById(id)) {
@@ -56,7 +52,7 @@ function ensureWobbleFilter(): string {
   svg.innerHTML = `
     <filter id="${id}" x="-10%" y="-10%" width="120%" height="120%">
       <feTurbulence type="fractalNoise" baseFrequency="0.011 0.017" numOctaves="2" seed="11" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="22" xChannelSelector="R" yChannelSelector="G"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="24" xChannelSelector="R" yChannelSelector="G"/>
     </filter>`;
   document.body.appendChild(svg);
   wobbleDefsReady = true;
@@ -82,6 +78,13 @@ function varsOf(p: Profile): Record<string, string> {
   return o;
 }
 
+interface SwitchAnim {
+  from: Profile;
+  to: Profile;
+  cx: number;
+  cy: number;
+}
+
 export default function Board() {
   // board re-renders only when the minute rolls - the per-second clock is
   // isolated in <Clock/> so switching never triggers a full-board repaint
@@ -95,15 +98,10 @@ export default function Board() {
   }, []);
 
   const orbRef = useRef<HTMLButtonElement>(null);
-  const toLayerRef = useRef<HTMLDivElement>(null);
-  const bandLayerRef = useRef<HTMLDivElement>(null);
-  const [switchAnim, setSwitchAnim] = useState<null | {
-    from: Profile;
-    to: Profile;
-    cx: number;
-    cy: number;
-  }>(null);
-  const switching = useRef(false);
+  const toRef = useRef<HTMLDivElement>(null);
+  const bandRef = useRef<HTMLDivElement>(null);
+  const [anim, setAnim] = useState<SwitchAnim | null>(null);
+  const running = useRef(false);
 
   // ?demo-wave=1: auto-trigger one theme wave after load (demo/test hook)
   useEffect(() => {
@@ -124,13 +122,12 @@ export default function Board() {
   }
 
   async function runThemeSwitch(): Promise<void> {
-    if (switching.current) return;
-    switching.current = true;
+    if (running.current) return;
+    running.current = true;
     try {
       const from = currentProfile();
       const idx = profiles.findIndex((p) => p.id === from.id);
       const to = profiles[(idx + 1) % profiles.length];
-      const { x: cx, y: cy } = orbOrigin();
 
       if (reducedMotion) {
         setProfile(to.id);
@@ -138,9 +135,10 @@ export default function Board() {
       }
 
       ensureWobbleFilter();
-      setSwitchAnim({ from, to, cx, cy });
+      const { x: cx, y: cy } = orbOrigin();
+      setAnim({ from, to, cx, cy });
 
-      // wait for the three layers to mount
+      // let the three scenes mount before driving the radius
       await new Promise<void>((r) =>
         requestAnimationFrame(() => requestAnimationFrame(() => r()))
       );
@@ -157,10 +155,10 @@ export default function Board() {
           const t = Math.min(1, (performance.now() - start) / WAVE_MS);
           const eased = 1 - Math.pow(1 - t, 3);
           const R = Math.max(1, eased * maxR);
-          const cpNew = `circle(${R}px at ${cx}px ${cy}px)`;
+          const cpTo = `circle(${R}px at ${cx}px ${cy}px)`;
           const cpBand = `circle(${R + BAND_W}px at ${cx}px ${cy}px)`;
-          if (toLayerRef.current) toLayerRef.current.style.clipPath = cpNew;
-          if (bandLayerRef.current) bandLayerRef.current.style.clipPath = cpBand;
+          if (toRef.current) toRef.current.style.clipPath = cpTo;
+          if (bandRef.current) bandRef.current.style.clipPath = cpBand;
           if (t < 1) requestAnimationFrame(frame);
           else resolve();
         };
@@ -169,9 +167,9 @@ export default function Board() {
 
       // commit: :root tokens + orb + storage; collapse is same-color
       setProfile(to.id);
-      setSwitchAnim(null);
+      setAnim(null);
     } finally {
-      switching.current = false;
+      running.current = false;
     }
   }
 
@@ -199,95 +197,139 @@ export default function Board() {
   const rows = generateTimetable(minuteDate);
   const cur = currentProfile();
 
-  const content = (
-    <>
-      <header class="head">
-        <h1>ISUI.REN — HAUPTBAHNHOF</h1>
-        <div class="controls">
-          <ThemeOrb />
-          <Clock />
-          <button
-            type="button"
-            class="toggle"
-            aria-pressed={paused.value}
-            aria-label={paused.value ? "Resume scrolling" : "Pause scrolling"}
-            onClick={() => (paused.value = !paused.value)}
-          >
-            {paused.value ? "▶" : "⏸"}
-          </button>
-        </div>
-      </header>
-
-      <table class="board">
-        <thead>
-          <tr>
-            <th scope="col">ZEIT</th>
-            <th scope="col">ZUG</th>
-            <th scope="col">NACH</th>
-            <th scope="col">GLEIS</th>
-            <th scope="col">STATUS</th>
-            <th scope="col" class="remark-col">BEMERKUNG</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((d) => (
-            <tr key={`${d.time}-${d.train}`} class={d.state === "boarding" ? "now" : ""}>
-              <td class={d.state === "cancelled" ? "cxl" : ""}>{d.time}</td>
-              <td>
-                <span class={"badge b-" + d.train.replace(/\s+/g, "-").toLowerCase()}>
-                  {d.train}
-                </span>
-              </td>
-              <td>
-                <a href={d.destHref}>{d.dest}</a>
-              </td>
-              <td>{d.platform}</td>
-              <td><StatusCell d={d} /></td>
-              <td class="remark-col">{d.remark ?? ""}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <footer class="foot">AKTUALISIERT {updated} · SOLL/IST · LIVE</footer>
-    </>
-  );
-
-  // --- switch animation: three stacked full-viewport layers ---
-  if (switchAnim) {
-    const { from, to, cx, cy } = switchAnim;
-    const at = `at ${cx}px ${cy}px`;
+  /** One complete page: hall + furniture + board. */
+  function Scene({ profile }: { profile: Profile }) {
     return (
-      <div class="switch-stage">
-        <div class="layer layer-from" style={varsOf(from)} aria-hidden="true">
-          <div class="wrap">{content}</div>
+      <div class="scene-body" style={varsOf(profile)}>
+        <div class="hall">
+          {/* floor */}
+          <div class="decor-floor" />
+          {/* waiting bench */}
+          <svg class="decor decor-bench" viewBox="0 0 220 110" width="220" height="110">
+            <rect x="18" y="8" width="184" height="7" rx="3" fill="var(--on-surface-variant)" opacity=".55" />
+            <rect x="26" y="4" width="8" height="52" rx="3" fill="var(--outline)" />
+            <rect x="186" y="4" width="8" height="52" rx="3" fill="var(--outline)" />
+            <rect x="10" y="52" width="200" height="12" rx="5" fill="var(--surface-container)" />
+            <rect x="30" y="64" width="9" height="42" rx="3" fill="var(--outline)" />
+            <rect x="181" y="64" width="9" height="42" rx="3" fill="var(--outline)" />
+            <rect x="24" y="98" width="21" height="5" rx="2" fill="var(--outline)" opacity=".6" />
+            <rect x="175" y="98" width="21" height="5" rx="2" fill="var(--outline)" opacity=".6" />
+          </svg>
+          {/* tall plant right */}
+          <svg class="decor decor-plant-r" viewBox="0 0 120 170" width="120" height="170">
+            <ellipse cx="60" cy="34" rx="14" ry="30" fill="var(--signal-ok)" transform="rotate(-18 60 34)" />
+            <ellipse cx="44" cy="46" rx="11" ry="26" fill="var(--signal-ok)" transform="rotate(-38 44 46)" opacity=".85" />
+            <ellipse cx="78" cy="44" rx="11" ry="27" fill="var(--signal-ok)" transform="rotate(16 78 44)" opacity=".9" />
+            <ellipse cx="60" cy="28" rx="9" ry="26" fill="var(--signal-ok)" opacity=".75" />
+            <path d="M60 58 C58 84 56 96 50 112 L70 112 C64 96 62 84 60 58 Z" fill="var(--signal-ok)" opacity=".55" />
+            <path d="M40 112 H80 L74 158 Q60 164 46 158 Z" fill="var(--signal-warn)" />
+            <rect x="37" y="108" width="46" height="9" rx="3" fill="var(--signal-warn)" />
+          </svg>
+          {/* small plant left */}
+          <svg class="decor decor-plant-l" viewBox="0 0 90 120" width="90" height="120">
+            <ellipse cx="45" cy="34" rx="11" ry="24" fill="var(--signal-ok)" transform="rotate(-14 45 34)" />
+            <ellipse cx="32" cy="46" rx="9" ry="20" fill="var(--signal-ok)" transform="rotate(-36 32 46)" opacity=".85" />
+            <ellipse cx="59" cy="44" rx="9" ry="21" fill="var(--signal-ok)" transform="rotate(15 59 44)" opacity=".9" />
+            <path d="M45 60 C43 76 42 84 38 94 L52 94 C48 84 47 76 45 60 Z" fill="var(--signal-ok)" opacity=".55" />
+            <path d="M31 94 H59 L54 116 Q45 121 36 116 Z" fill="var(--signal-warn)" />
+            <rect x="29" y="91" width="32" height="7" rx="3" fill="var(--signal-warn)" />
+          </svg>
         </div>
-        <div
-          class="layer layer-band"
-          ref={bandLayerRef}
-          style={{
-            ...varsOf(to),
-            clipPath: `circle(0px ${at})`,
-            filter: "url(#bahnhof-float)",
-          }}
-          aria-hidden="true"
-        >
-          <div class="wrap">{content}</div>
-        </div>
-        <div
-          class="layer layer-to"
-          ref={toLayerRef}
-          style={{ ...varsOf(to), clipPath: `circle(0px ${at})` }}
-        >
-          <div class="wrap">{content}</div>
+        <div class="wrap">
+          <header class="head">
+            <h1>ISUI.REN — HAUPTBAHNHOF</h1>
+            <div class="controls">
+              <button
+                ref={orbRef}
+                type="button"
+                class="theme-orb"
+                style={{ background: "var(--surface)" }}
+                aria-label={`Switch theme (current: ${profile.label})`}
+                title={`Switch theme (current: ${profile.label})`}
+                onClick={() => runThemeSwitch()}
+              >
+                <span class="orb-half" aria-hidden="true" />
+              </button>
+              <Clock />
+              <button
+                type="button"
+                class="toggle"
+                aria-pressed={paused.value}
+                aria-label={paused.value ? "Resume scrolling" : "Pause scrolling"}
+                onClick={() => (paused.value = !paused.value)}
+              >
+                {paused.value ? "▶" : "⏸"}
+              </button>
+            </div>
+          </header>
+
+          <table class="board">
+            <thead>
+              <tr>
+                <th scope="col">ZEIT</th>
+                <th scope="col">ZUG</th>
+                <th scope="col">NACH</th>
+                <th scope="col">GLEIS</th>
+                <th scope="col">STATUS</th>
+                <th scope="col" class="remark-col">BEMERKUNG</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((d) => (
+                <tr key={`${d.time}-${d.train}`} class={d.state === "boarding" ? "now" : ""}>
+                  <td class={d.state === "cancelled" ? "cxl" : ""}>{d.time}</td>
+                  <td>
+                    <span class={"badge b-" + d.train.replace(/\s+/g, "-").toLowerCase()}>
+                      {d.train}
+                    </span>
+                  </td>
+                  <td>
+                    <a href={d.destHref}>{d.dest}</a>
+                  </td>
+                  <td>{d.platform}</td>
+                  <td><StatusCell d={d} /></td>
+                  <td class="remark-col">{d.remark ?? ""}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <footer class="foot">AKTUALISIERT {updated} · SOLL/IST · LIVE</footer>
         </div>
       </div>
     );
   }
 
-  return (
-    <div class="wrap" style={varsOf(cur)}>
-      {content}
-    </div>
-  );
+  // --- switch: three stacked full-page scenes ---
+  if (anim) {
+    const at = `at ${anim.cx}px ${anim.cy}px`;
+    return (
+      <>
+        <div class="scene scene-from" style={varsOf(anim.from)} aria-hidden="true">
+          <Scene profile={anim.from} />
+        </div>
+        <div
+          class="scene scene-band"
+          ref={bandRef}
+          style={{
+            ...varsOf(anim.to),
+            clipPath: `circle(0px ${at})`,
+            filter: "url(#bahnhof-float)",
+          }}
+          aria-hidden="true"
+        >
+          <Scene profile={anim.to} />
+        </div>
+        <div
+          class="scene scene-to"
+          ref={toRef}
+          style={{ ...varsOf(anim.to), clipPath: `circle(0px ${at})` }}
+        >
+          <Scene profile={anim.to} />
+        </div>
+      </>
+    );
+  }
+
+  return <Scene profile={cur} />;
 }

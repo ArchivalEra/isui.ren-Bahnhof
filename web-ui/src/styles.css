@@ -162,39 +162,24 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   background: linear-gradient(90deg, rgba(17,17,17,0.55) 0 50%, transparent 50%);
 }
 
-/* radial theme wave: three stacked layers */
-.switch-stage {
-  /* absolute (document coords), not fixed: the collapse back to the
-     single in-flow layer must be pixel-aligned or it reads as a blink */
-  position: absolute;
-  inset: 0;
-  min-height: 100vh;
-  z-index: 60;
-}
-.layer {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-.layer-from { pointer-events: none; }
-.layer-band { pointer-events: none; will-change: clip-path, filter; }
-.layer-to { will-change: clip-path; }
-
-/* radial theme flood overlay */
-.theme-flood {
+/* radial theme wave: three stacked full-page scenes */
+.scene {
   position: fixed;
   inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 80;
-  pointer-events: none;
-  display: none;
+  overflow: hidden;
+  z-index: 60;
 }
-
-/* float: content refracts through the wave while it expands */
-.wrap.wobbling { filter: url(#bahnhof-float); animation: float-pulse 700ms ease-out; }
-@keyframes float-pulse {
-  40% { transform: scale(1.014); }
+.scene-from { z-index: 1; }
+.scene-band {
+  z-index: 2;
+  filter: url(#bahnhof-float);
+  will-change: clip-path;
+}
+.scene-to { z-index: 3; will-change: clip-path; }
+.scene-body {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
 }
 
 /* ---------- the HALL (station room around the board) ---------- */
