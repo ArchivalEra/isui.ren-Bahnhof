@@ -1,26 +1,26 @@
 // Bahnhof — live departure board.
 // Timetable is generated from the real clock (timetable.ts); a native
-// <table> lays out the columns. Theme switching rides a WATER WAVE:
+// <table> lays out the columns.
 //
-// - HTML-in-Canvas mode (flag on): the board DOM lives in a layoutsubtree
-//   canvas; during the sweep the old frame stays as base, the recolored
-//   live element is re-drawn in vertical strips behind the wave front with
-//   sinusoidal displacement + magnification - text refracts like it is
-//   seen through a convex water surface.
-// - Fallback: a full-height band with backdrop-filter (SVG turbulence +
-//   displacement) sweeps the page, wobbling the real content under it.
+// Theme switching is a RADIAL WATER WAVE from the orb. Three stacked
+// copies of the board are mounted for ~1s:
+//   base  - old theme, everything outside the wave
+//   band  - target colors + SVG displacement filter: text passing through
+//           the rim refracts like it is under a convex water surface
+//   inner - target colors, revealed inside the growing circle
+// clip-path circles expand from the click point via rAF (refs only - no
+// re-renders during the animation). When the wave covers the viewport the
+// profile is committed and the extra layers collapse seamlessly: the
+// remaining layer is pixel-identical to the single-page render.
 import { useEffect, useRef, useState } from "preact/hooks";
 import { signal } from "@preact/signals";
-import { profiles, currentId, currentProfile, setProfile } from "./theme";
+import { profiles, currentProfile, setProfile, type Profile } from "./theme";
 import { generateTimetable, type Departure } from "./timetable";
-import {
-  detectHtmlInCanvas,
-  asCanvasWithApi,
-  type ElementSnapshot,
-} from "./canvasStage";
 
 const paused = signal(false);
 
+const BAND_W = 220; // rim water width, px
+const WAVE_MS = 950;
 
 /** Isolated live clock: re-renders itself every second, nothing else. */
 function Clock() {
@@ -42,7 +42,7 @@ function Clock() {
 }
 
 let wobbleDefsReady = false;
-/** Inject (once) the turbulence+displacement filter used for the float. */
+/** Inject (once) the turbulence+displacement filter used by the band. */
 function ensureWobbleFilter(): string {
   const id = "bahnhof-float";
   if (wobbleDefsReady || document.getElementById(id)) {
@@ -56,7 +56,7 @@ function ensureWobbleFilter(): string {
   svg.innerHTML = `
     <filter id="${id}" x="-10%" y="-10%" width="120%" height="120%">
       <feTurbulence type="fractalNoise" baseFrequency="0.011 0.017" numOctaves="2" seed="11" result="n"/>
-      <feDisplacementMap id="${id}-dm" in="SourceGraphic" in2="n" scale="0" xChannelSelector="R" yChannelSelector="G"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="22" xChannelSelector="R" yChannelSelector="G"/>
     </filter>`;
   document.body.appendChild(svg);
   wobbleDefsReady = true;
@@ -76,6 +76,12 @@ function StatusCell({ d }: { d: Departure }) {
   return <span class="status ok">ON TIME</span>;
 }
 
+function varsOf(p: Profile): Record<string, string> {
+  const o: Record<string, string> = {};
+  for (const [k, v] of Object.entries(p.tokens)) o[k] = v;
+  return o;
+}
+
 export default function Board() {
   // board re-renders only when the minute rolls - the per-second clock is
   // isolated in <Clock/> so switching never triggers a full-board repaint
@@ -88,197 +94,82 @@ export default function Board() {
     return () => clearInterval(id);
   }, []);
 
-  const [support] = useState(detectHtmlInCanvas);
+  const orbRef = useRef<HTMLButtonElement>(null);
+  const toLayerRef = useRef<HTMLDivElement>(null);
+  const bandLayerRef = useRef<HTMLDivElement>(null);
+  const [switchAnim, setSwitchAnim] = useState<null | {
+    from: Profile;
+    to: Profile;
+    cx: number;
+    cy: number;
+  }>(null);
+  const switching = useRef(false);
 
   // ?demo-wave=1: auto-trigger one theme wave after load (demo/test hook)
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has("demo-wave")) return;
     const id = setTimeout(() => runThemeSwitch(), 400);
     return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const domRef = useRef<HTMLDivElement>(null);
-  const floodRef = useRef<HTMLCanvasElement>(null);
-  const switching = useRef(false);
-
-  // --- canvas paint loop (HTML-in-Canvas mode) ---
-  useEffect(() => {
-    if (!support.supported) return;
-    const cv = canvasRef.current;
-    const el = domRef.current;
-    if (!cv || !el) return;
-    const api = asCanvasWithApi(cv);
-    if (!api) return;
-    const ctx = cv.getContext("2d");
-    if (!ctx) return;
-
-    const resize = () => {
-      const rect = cv.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      cv.width = Math.max(1, Math.round(rect.width * dpr));
-      cv.height = Math.max(1, Math.round((el.offsetHeight || rect.height) * dpr));
-      api.requestPaint?.();
-    };
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(cv);
-
-    const onPaint = () => {
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      ctx.save();
-      ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, cv.width / dpr, cv.height / dpr);
-      ctx.drawElementImage(el);
-      ctx.restore();
-      api.requestPaint?.();
-    };
-
-    cv.addEventListener("paint", onPaint);
-    api.requestPaint?.();
-    return () => {
-      cv.removeEventListener("paint", onPaint);
-      ro.disconnect();
-    };
-  }, [support.supported]);
 
   const reducedMotion =
     typeof window !== "undefined" &&
     window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  /**
-   * Radial theme flood from an origin point: the page underneath flips to
-   * the next profile immediately; a fixed overlay painted with the OLD
-   * surface color gets an expanding destination-out hole cut from the
-   * origin, so the new theme is revealed as a circular wave. The rim
-   * carries the target color with a wobbled water lip.
-   */
-  async function runThemeSwitch(origin?: { x: number; y: number }): Promise<void> {
+  function orbOrigin(): { x: number; y: number } {
+    const r = orbRef.current?.getBoundingClientRect();
+    if (r) return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+    return { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+  }
+
+  async function runThemeSwitch(): Promise<void> {
     if (switching.current) return;
     switching.current = true;
     try {
-      const idx = profiles.findIndex((p) => p.id === currentId.value);
-      const oldProfile = profiles[idx];
-      const nextProfile = profiles[(idx + 1) % profiles.length];
+      const from = currentProfile();
+      const idx = profiles.findIndex((p) => p.id === from.id);
+      const to = profiles[(idx + 1) % profiles.length];
+      const { x: cx, y: cy } = orbOrigin();
 
-      const reducedMotion =
-        window.matchMedia("(prefers-color-scheme: reduce)").matches ||
-        window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       if (reducedMotion) {
-        setProfile(nextProfile.id);
+        setProfile(to.id);
         return;
       }
 
-      const ov = floodRef.current;
-      const ctx = ov?.getContext("2d");
-      if (!ov || !ctx) {
-        setProfile(nextProfile.id);
-        return;
-      }
+      ensureWobbleFilter();
+      setSwitchAnim({ from, to, cx, cy });
 
-      const x = origin?.x ?? window.innerWidth / 2;
-      const y = origin?.y ?? window.innerHeight / 2;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const W = window.innerWidth;
-      const H = window.innerHeight;
-      ov.width = Math.round(W * dpr);
-      ov.height = Math.round(H * dpr);
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      ov.style.display = "block";
+      // wait for the three layers to mount
+      await new Promise<void>((r) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => r()))
+      );
 
-      // flip tokens first: the page under the overlay is already the target
-      setProfile(nextProfile.id);
-
-      // float: content wobbles through the water while the wave expands,
-      // then settles crisp exactly when the flood covers the viewport
-      const filterRef = ensureWobbleFilter();
-      setWobble(true);
-      const dm = document.querySelector(`#bahnhof-float-dm`);
-      const wobbleStart = performance.now();
-      const wobbleFrame = () => {
-        if (!wobble) return;
-        const dt = performance.now() - wobbleStart;
-        (dm as SVGElement | null)?.setAttribute(
-          "scale",
-          String(Math.sin(Math.min(1, dt / EXPAND) * Math.PI) * 34)
-        );
-        if (dt < EXPAND) requestAnimationFrame(wobbleFrame);
-      };
-      requestAnimationFrame(wobbleFrame);
-
-      const oldSurface = oldProfile.tokens["--surface"];
-      const newSurface = nextProfile.tokens["--surface"];
-      const maxR = Math.hypot(Math.max(x, W - x), Math.max(y, H - y)) * 1.06;
-      const EXPAND = 700;
-      const HOLD = 140;
-      const FADE = 240;
+      const maxR =
+        Math.hypot(
+          Math.max(cx, window.innerWidth - cx),
+          Math.max(cy, window.innerHeight - cy)
+        ) * 1.06;
       const start = performance.now();
 
       await new Promise<void>((resolve) => {
         const frame = () => {
-          const total = performance.now() - start;
-          ctx.clearRect(0, 0, W, H);
-
-          if (total < EXPAND) {
-            const t = total / EXPAND;
-            const eased = 1 - Math.pow(1 - t, 3);
-            const R = Math.max(1, eased * maxR);
-            // old surface blanket
-            ctx.globalCompositeOperation = "source-over";
-            ctx.fillStyle = oldSurface;
-            ctx.fillRect(0, 0, W, H);
-            // expanding hole (soft lip)
-            ctx.globalCompositeOperation = "destination-out";
-            const hole = ctx.createRadialGradient(x, y, R * 0.88, x, y, R);
-            hole.addColorStop(0, "rgba(0,0,0,1)");
-            hole.addColorStop(1, "rgba(0,0,0,0)");
-            ctx.fillStyle = hole;
-            ctx.beginPath();
-            ctx.arc(x, y, R, 0, Math.PI * 2);
-            ctx.fill();
-
-            // water lip in the TARGET color riding the rim, radius wobbling
-            ctx.globalCompositeOperation = "source-over";
-            const seg = 64;
-            ctx.lineWidth = 22;
-            ctx.lineCap = "round";
-            ctx.strokeStyle = newSurface;
-            ctx.beginPath();
-            for (let i = 0; i <= seg; i++) {
-              const th = (i / seg) * Math.PI * 2;
-              const wob =
-                1 +
-                0.018 * Math.sin(th * 6 + total * 0.02) +
-                0.01 * Math.sin(th * 11 - total * 0.03);
-              const rr = R * wob;
-              const px = x + Math.cos(th) * rr;
-              const py = y + Math.sin(th) * rr;
-              i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
-            }
-            ctx.stroke();
-            ctx.lineWidth = 3;
-            ctx.strokeStyle = "rgba(255,255,255,0.55)";
-            ctx.stroke();
-            requestAnimationFrame(frame);
-          } else if (total < EXPAND + HOLD + FADE) {
-            if (wobble) {
-              (dm as SVGElement | null)?.setAttribute("scale", "0");
-              setWobble(false);
-            }
-            const t = (total - EXPAND) / (HOLD + FADE);
-            // fully covered in target color, then fade out to show it for real
-            ctx.globalAlpha = t < 0.4 ? 1 : 1 - (t - 0.4) / 0.6;
-            ctx.fillStyle = newSurface;
-            ctx.fillRect(0, 0, W, H);
-            ctx.globalAlpha = 1;
-            requestAnimationFrame(frame);
-          } else {
-            ctx.clearRect(0, 0, W, H);
-            ov.style.display = "none";
-            resolve();
-          }
+          const t = Math.min(1, (performance.now() - start) / WAVE_MS);
+          const eased = 1 - Math.pow(1 - t, 3);
+          const R = Math.max(1, eased * maxR);
+          const cpNew = `circle(${R}px at ${cx}px ${cy}px)`;
+          const cpBand = `circle(${R + BAND_W}px at ${cx}px ${cy}px)`;
+          if (toLayerRef.current) toLayerRef.current.style.clipPath = cpNew;
+          if (bandLayerRef.current) bandLayerRef.current.style.clipPath = cpBand;
+          if (t < 1) requestAnimationFrame(frame);
+          else resolve();
         };
         requestAnimationFrame(frame);
       });
+
+      // commit: :root tokens + orb + storage; collapse is same-color
+      setProfile(to.id);
+      setSwitchAnim(null);
     } finally {
       switching.current = false;
     }
@@ -288,26 +179,27 @@ export default function Board() {
     const cur = currentProfile();
     return (
       <button
+        ref={orbRef}
         type="button"
         class="theme-orb"
         style={{ background: cur.tokens["--surface"] }}
         aria-label={`Switch theme (current: ${cur.label})`}
         title={`Switch theme (current: ${cur.label})`}
-        onClick={(e) => {
-                  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                  runThemeSwitch({ x: r.left + r.width / 2, y: r.top + r.height / 2 });
-                }}
+        onClick={() => runThemeSwitch()}
       >
         <span class="orb-half" aria-hidden="true" />
       </button>
     );
   }
 
-  const updated = minuteDate.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+  const updated = minuteDate.toLocaleTimeString("de-DE", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
   const rows = generateTimetable(minuteDate);
-  const [wobble, setWobble] = useState(false);
+  const cur = currentProfile();
 
-  const inner = (
+  const content = (
     <>
       <header class="head">
         <h1>ISUI.REN — HAUPTBAHNHOF</h1>
@@ -361,22 +253,41 @@ export default function Board() {
     </>
   );
 
-  return (
-    <>
-      <canvas ref={floodRef} class="theme-flood" aria-hidden="true" />
-      {support.supported ? (
-        <canvas
-          ref={canvasRef}
-          {...({ layoutsubtree: true } as object)}
-          class="stage-canvas"
+  // --- switch animation: three stacked full-viewport layers ---
+  if (switchAnim) {
+    const { from, to, cx, cy } = switchAnim;
+    const at = `at ${cx}px ${cy}px`;
+    return (
+      <div class="switch-stage">
+        <div class="layer layer-from" style={varsOf(from)} aria-hidden="true">
+          <div class="wrap">{content}</div>
+        </div>
+        <div
+          class="layer layer-band"
+          ref={bandLayerRef}
+          style={{
+            ...varsOf(to),
+            clipPath: `circle(0px ${at})`,
+            filter: "url(#bahnhof-float)",
+          }}
+          aria-hidden="true"
         >
-          <div ref={domRef} class={"wrap" + (wobble ? " wobbling" : "")}>
-            {inner}
-          </div>
-        </canvas>
-      ) : (
-        <div class={"wrap" + (wobble ? " wobbling" : "")}>{inner}</div>
-      )}
-    </>
+          <div class="wrap">{content}</div>
+        </div>
+        <div
+          class="layer layer-to"
+          ref={toLayerRef}
+          style={{ ...varsOf(to), clipPath: `circle(0px ${at})` }}
+        >
+          <div class="wrap">{content}</div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div class="wrap" style={varsOf(cur)}>
+      {content}
+    </div>
   );
 }
