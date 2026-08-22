@@ -5,6 +5,7 @@
   --surface: #ffffff;
   --surface-dim: #fafafa;
   --surface-variant: #f2f2f2;
+  --surface-container: #ececec;
   --outline: #d9d9d9;
   --on-surface: #111111;
   --on-surface-variant: #4d4d4d;
@@ -74,27 +75,39 @@ body {
 }
 .sec { font-size: 0.85rem; color: var(--on-surface-variant); }
 
-/* the board itself — a real table */
+/* the board itself — a real table.
+   DECoupled: no fill, no frame of its own. The board is pure typography -
+   lines and letters carry the color directly on the room's backdrop, so a
+   glow can never be cut by a panel edge again. */
 .board {
   width: 100%;
   border-collapse: collapse;
-  background: var(--surface);
-  border: 1px solid var(--outline);
+  background: transparent;
 }
 .board th,
 .board td {
   text-align: left;
   padding: 0.55rem 0.8rem;
-  border-bottom: 1px solid var(--outline);
+  border-bottom: 1px solid color-mix(in srgb, var(--outline) 45%, transparent);
   font-size: 0.95rem;
+}
+/* body cells carry the same visual weight as the destination links, so
+   every column reads as it crosses the wave front - not just NACH */
+.board tbody td {
+  font-weight: 600;
 }
 .board th {
   font-size: 0.65rem;
   letter-spacing: 0.22em;
   color: var(--on-surface-variant);
-  border-bottom-width: 2px;
+  border-bottom: 2px solid color-mix(in srgb, var(--outline) 70%, transparent);
 }
-.board tbody tr:hover { background: var(--surface-dim); }
+/* column rules back in: the timetable keeps its vertical grid */
+.board th + th,
+.board td + td {
+  border-left: 1px solid color-mix(in srgb, var(--outline) 32%, transparent);
+}
+.board tbody tr:hover { background: color-mix(in srgb, var(--surface-dim) 55%, transparent); }
 .board tbody tr.now { background: rgba(180, 106, 0, 0.08); }
 .board tbody tr.now td:first-child { box-shadow: inset 3px 0 0 var(--signal-warn); }
 
@@ -162,7 +175,9 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   background: linear-gradient(90deg, rgba(17,17,17,0.55) 0 50%, transparent 50%);
 }
 
-/* radial theme wave: three stacked full-page scenes */
+/* radial theme wave: three stacked full-page scenes.
+   The band wrapper carries the displacement filter so it warps the
+   already-clipped ring below it - clip first, then displace. */
 .scene {
   position: fixed;
   inset: 0;
@@ -170,9 +185,10 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   z-index: 60;
 }
 .scene-from { z-index: 1; }
-.scene-band {
-  z-index: 2;
-  filter: url(#bahnhof-float);
+.scene-band { z-index: 2; filter: url(#bahnhof-float); }
+.band-clip {
+  position: absolute;
+  inset: 0;
   will-change: clip-path;
 }
 .scene-to { z-index: 3; will-change: clip-path; }
@@ -180,6 +196,10 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   position: relative;
   min-height: 100vh;
   overflow: hidden;
+  /* resolve inherited text color HERE, inside the scene, so each stacked
+     layer paints its own theme - otherwise cells inherit from :root and
+     every column flips only at commit instead of riding the wave */
+  color: var(--on-surface);
   /* the whole room is themed by this scene's tokens - walls included */
   background:
     radial-gradient(120% 90% at 50% 30%, var(--surface-dim) 0%, var(--surface-variant) 58%, var(--surface-container) 100%);
@@ -210,41 +230,48 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   .decor-plant-l { display: none; }
 }
 
-/* ---------- night TV glow: dark profiles only, heart stays clean ---------- */
-html[data-glow="heart-dark"] .board,
-html[data-glow="station"] .board {
-  border-color: transparent; /* a lit screen has no hard bezel line */
-  box-shadow:
-    0 0 18px rgba(154, 190, 255, 0.30),
-    0 0 70px rgba(110, 150, 230, 0.22),
-    0 0 220px 40px rgba(80, 120, 210, 0.15),
-    0 24px 60px rgba(0, 0, 0, 0.5);
-  animation: screen-breathe 7s ease-in-out infinite alternate;
+/* ---------- night TV glow: an independent light layer, NOT a panel style.
+   It lives behind the content and is bounded only by its own gradient, so
+   no rectangle can ever slice it. Dark profiles light the room; heart
+   stays clean paper. */
+.wrap {
+  position: relative;
+  z-index: 1;
 }
-html[data-glow="heart-dark"] .hall::after,
-html[data-glow="station"] .hall::after {
-  content: "";
+.screen-glow {
   position: absolute;
   left: 50%;
-  top: 56vh;
-  width: min(72vw, 920px);
-  height: 36vh;
+  top: 6vh;
+  width: min(76vw, 980px);
+  height: 52vh;
   transform: translateX(-50%);
-  background: radial-gradient(
-    55% 100% at 50% 0%,
-    rgba(140, 170, 235, 0.14) 0%,
-    rgba(140, 170, 235, 0.05) 45%,
-    transparent 75%
-  );
+  background:
+    radial-gradient(50% 40% at 50% 32%, rgba(154, 190, 255, 0.20) 0%, rgba(110, 150, 230, 0.08) 55%, transparent 78%);
+  filter: blur(26px);
+  opacity: 0;
   pointer-events: none;
+  transition: opacity 1.2s ease;
+}
+html[data-glow="heart-dark"] .screen-glow,
+html[data-glow="station"] .screen-glow {
+  opacity: 1;
+  animation: screen-breathe 7s ease-in-out infinite alternate;
 }
 @keyframes screen-breathe {
-  from { filter: brightness(0.97); }
-  to { filter: brightness(1.02); }
+  from { filter: blur(26px) brightness(0.94); }
+  to { filter: blur(26px) brightness(1.06); }
+}
+/* the lit screen pools a little light on the floor - gradient-bounded,
+   so it fades out inside the strip instead of stopping at an edge */
+html[data-glow="heart-dark"] .decor-floor,
+html[data-glow="station"] .decor-floor {
+  background:
+    radial-gradient(42% 160% at 50% 0%, rgba(140, 170, 235, 0.16) 0%, rgba(140, 170, 235, 0.04) 55%, transparent 85%),
+    linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.06) 100%);
 }
 @media (prefers-reduced-motion: reduce) {
-  html[data-glow="heart-dark"] .board,
-  html[data-glow="station"] .board {
+  html[data-glow="heart-dark"] .screen-glow,
+  html[data-glow="station"] .screen-glow {
     animation: none;
   }
 }

@@ -21,7 +21,7 @@ const speedParam =
   typeof window !== "undefined"
     ? Number(new URLSearchParams(window.location.search).get("wavespeed"))
     : NaN;
-const WAVE_MS = Number.isFinite(speedParam) && speedParam >= 200 ? speedParam : 1000;
+const WAVE_MS = Number.isFinite(speedParam) && speedParam >= 200 ? speedParam : 1600;
 
 /** Isolated live clock: re-renders itself every second, nothing else. */
 function Clock() {
@@ -57,7 +57,7 @@ function ensureWobbleFilter(): string {
   svg.innerHTML = `
     <filter id="${id}" x="-10%" y="-10%" width="120%" height="120%">
       <feTurbulence type="fractalNoise" baseFrequency="0.011 0.017" numOctaves="2" seed="11" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="24" xChannelSelector="R" yChannelSelector="G"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="30" xChannelSelector="R" yChannelSelector="G"/>
     </filter>`;
   document.body.appendChild(svg);
   wobbleDefsReady = true;
@@ -81,6 +81,14 @@ function varsOf(p: Profile): Record<string, string> {
   const o: Record<string, string> = {};
   for (const [k, v] of Object.entries(p.tokens)) o[k] = v;
   return o;
+}
+
+/** Annulus as one nonzero-winding path: outer loop clockwise, inner loop
+ *  counter-clockwise, so the middle winds to zero and clips away. */
+function ringPath(cx: number, cy: number, rIn: number, rOut: number): string {
+  const loop = (r: number, sweep: number) =>
+    `M ${cx + r} ${cy} A ${r} ${r} 0 1 ${sweep} ${cx - r} ${cy} A ${r} ${r} 0 1 ${sweep} ${cx + r} ${cy} Z`;
+  return `${loop(rOut, 1)} ${loop(Math.max(1, rIn), 0)}`;
 }
 
 interface SwitchAnim {
@@ -159,41 +167,52 @@ export default function Board() {
         ) * 1.06;
       const start = performance.now();
 
-      await new Promise<void>((resolve) => {
-        const frame = () => {
+      // failsafe: whatever happens to the rAF loop, the wave always
+      // completes and the layers always collapse - a stuck mid-state is
+      // the one failure mode this UI must never show
+      const commit = () => {
+        applyGlow(to.id);
+        setProfile(to.id);
+        setAnim(null);
+      };
+      const failsafe = setTimeout(commit, WAVE_MS + 900);
+
+      try {
+        await new Promise<void>((resolve) => {
+          const frame = () => {
           const t = Math.min(1, (performance.now() - start) / WAVE_MS);
           const eased = 1 - Math.pow(1 - t, 3);
           const R = Math.max(1, eased * maxR);
           const cpTo = `circle(${R}px at ${cx}px ${cy}px)`;
-          const cpBand = `circle(${R + BAND_W}px at ${cx}px ${cy}px)`;
+          // inner radius sits below the reveal edge so displacement can
+          // never open a gap between the water ring and the revealed disc
+          const cpBand = `path("${ringPath(cx, cy, R - 24, R + BAND_W)}")`;
           if (toRef.current) toRef.current.style.clipPath = cpTo;
           if (bandRef.current) bandRef.current.style.clipPath = cpBand;
-          if (t < 1) requestAnimationFrame(frame);
-          else resolve();
-        };
-        requestAnimationFrame(frame);
-      });
+            if (t < 1) requestAnimationFrame(frame);
+            else resolve();
+          };
+          requestAnimationFrame(frame);
+        });
+      } finally {
+        clearTimeout(failsafe);
+      }
 
-      // commit: :root tokens + orb + storage; collapse is same-color.
-      // the glow catches up to the new theme only now
-      applyGlow(to.id);
-      setProfile(to.id);
-      setAnim(null);
+      commit();
     } finally {
       running.current = false;
     }
   }
 
-  function ThemeOrb() {
-    const cur = currentProfile();
+  function ThemeOrb({ profile }: { profile: Profile }) {
     return (
       <button
         ref={orbRef}
         type="button"
         class="theme-orb"
-        style={{ background: cur.tokens["--surface"] }}
-        aria-label={`Switch theme (current: ${cur.label})`}
-        title={`Switch theme (current: ${cur.label})`}
+        style={{ background: "var(--surface)" }}
+        aria-label={`Switch theme (current: ${profile.label})`}
+        title={`Switch theme (current: ${profile.label})`}
         onClick={() => runThemeSwitch()}
       >
         <span class="orb-half" aria-hidden="true" />
@@ -246,21 +265,14 @@ export default function Board() {
             <rect x="29" y="91" width="32" height="7" rx="3" fill="var(--signal-warn)" />
           </svg>
         </div>
+        {/* room light: an independent glow behind the content - no panel
+            owns it, so nothing can slice it */}
+        <div class="screen-glow" aria-hidden="true" />
         <div class="wrap">
           <header class="head">
             <h1>ISUI.REN — HAUPTBAHNHOF</h1>
             <div class="controls">
-              <button
-                ref={orbRef}
-                type="button"
-                class="theme-orb"
-                style={{ background: "var(--surface)" }}
-                aria-label={`Switch theme (current: ${profile.label})`}
-                title={`Switch theme (current: ${profile.label})`}
-                onClick={() => runThemeSwitch()}
-              >
-                <span class="orb-half" aria-hidden="true" />
-              </button>
+              <ThemeOrb profile={profile} />
               <Clock />
               <button
                 type="button"
@@ -288,7 +300,9 @@ export default function Board() {
             <tbody>
               {rows.map((d) => (
                 <tr key={`${d.time}-${d.train}`} class={d.state === "boarding" ? "now" : ""}>
-                  <td class={d.state === "cancelled" ? "cxl" : ""}>{d.time}</td>
+                  <td class={d.state === "cancelled" ? "cxl" : ""}>
+                    <span>{d.time}</span>
+                  </td>
                   <td>
                     <span class={"badge b-" + d.train.replace(/\s+/g, "-").toLowerCase()}>
                       {d.train}
@@ -297,9 +311,13 @@ export default function Board() {
                   <td>
                     <a href={d.destHref}>{d.dest}</a>
                   </td>
-                  <td>{d.platform}</td>
+                  <td>
+                    <span>{d.platform}</span>
+                  </td>
                   <td><StatusCell d={d} /></td>
-                  <td class="remark-col">{d.remark ?? ""}</td>
+                  <td class="remark-col">
+                    <span>{d.remark ?? ""}</span>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -319,17 +337,16 @@ export default function Board() {
         <div class="scene scene-from" style={varsOf(anim.from)} aria-hidden="true">
           <Scene profile={anim.from} />
         </div>
-        <div
-          class="scene scene-band"
-          ref={bandRef}
-          style={{
-            ...varsOf(anim.to),
-            clipPath: `circle(0px ${at})`,
-            filter: "url(#bahnhof-float)",
-          }}
-          aria-hidden="true"
-        >
-          <Scene profile={anim.to} />
+        {/* filter lives on the wrapper so it displaces the ALREADY clipped
+            ring - both rim edges come out wobbled, not compass-drawn */}
+        <div class="scene scene-band" style={varsOf(anim.to)} aria-hidden="true">
+          <div
+            class="band-clip"
+            ref={bandRef}
+            style={{ clipPath: `circle(0px ${at})` }}
+          >
+            <Scene profile={anim.to} />
+          </div>
         </div>
         <div
           class="scene scene-to"
