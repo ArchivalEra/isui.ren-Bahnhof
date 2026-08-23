@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, useLayoutEffect } from "preact/hooks";
 import { signal } from "@preact/signals";
 import { profiles, currentProfile, setProfile, type Profile } from "./theme";
 import { initialBoard, tickBoard, type Departure, type ScheduleMem } from "./timetable";
+import { waveEngineStart } from "./wave-engine";
 import type { ComponentChildren } from "preact";
 
 const paused = signal(false);
@@ -262,6 +263,27 @@ export default function Board() {
       if (reducedMotion) {
         setProfile(to.id);
         return;
+      }
+
+      // GPU engine first: snapshot both scenes, cover the page, and swap
+      // the real DOM underneath while the canvas hides the swap. If the
+      // engine is unavailable we fall through to the CSS three-scene path.
+      if (!reducedMotion && typeof window !== "undefined") {
+        const stageNode = document.querySelector(".scene-body");
+        if (stageNode) {
+          const run = await waveEngineStart({
+            stageNode,
+            fromVars: varsOf(from),
+            toVars: varsOf(to),
+            orb: orbOrigin(),
+            durationMs: WAVE_MS,
+          });
+          if (run) {
+            setProfile(to.id);
+            await run.done;
+            return;
+          }
+        }
       }
 
       ensureWobbleFilter();
