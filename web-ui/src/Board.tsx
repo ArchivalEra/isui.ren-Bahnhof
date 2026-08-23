@@ -167,6 +167,40 @@ export default function Board() {
     return () => clearInterval(id);
   }, []);
 
+  // keyboard avoidance (universal VisualViewport path): the distance from
+  // the layout viewport's bottom to the visible bottom IS the keyboard.
+  // Rotation settles late on iOS, so a short debounce re-runs the math.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const root = document.documentElement;
+    let raf = 0;
+    const lift = () => {
+      raf = 0;
+      if (vv.scale > 1) return; // pinch-zoom: leave things alone
+      const kb = Math.max(
+        0,
+        document.documentElement.clientHeight - (vv.offsetTop + vv.height),
+      );
+      root.style.setProperty("--kb-inset", `${Math.round(kb)}px`);
+    };
+    const onResize = () => {
+      if (!raf) raf = requestAnimationFrame(lift);
+    };
+    const onRotation = () => setTimeout(onResize, 250);
+    vv.addEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    window.addEventListener("orientationchange", onRotation);
+    lift();
+    return () => {
+      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("scroll", onResize);
+      window.removeEventListener("orientationchange", onRotation);
+      cancelAnimationFrame(raf);
+      root.style.removeProperty("--kb-inset");
+    };
+  }, []);
+
   // FLIP: when leading rows leave, hold the survivors at their old
   // position for one frame, then glide them up into place
   useLayoutEffect(() => {
@@ -389,9 +423,12 @@ export default function Board() {
             <path d="M20 48 l10 -12 l8 6 l9 -10" fill="none" stroke="var(--on-surface-variant)" stroke-width="2" opacity=".6" />
           </svg>
         </div>
-        <div class="wrap">
-          <header class="head">
-            <h1>ISUI.REN — HAUPTBAHNHOF</h1>
+        {/* elastic stage: the board centers here and absorbs all growth
+            internally - the search slot below never moves */}
+        <div class="stage">
+          <div class="wrap">
+            <header class="head">
+              <h1>ISUI.REN — HAUPTBAHNHOF</h1>
             <div class="controls">
               <ThemeOrb profile={profile} />
               <Clock />
@@ -453,22 +490,23 @@ export default function Board() {
             </tbody>
           </table>
 
-          <footer class="foot">
-            AKTUALISIERT {updated} · SOLL/IST · LIVE
-            <form class="board-search" onSubmit={(e) => e.preventDefault()}>
-              <input
-                type="search"
-                class="board-search-input"
-                placeholder="SUCHE — search the timetable"
-                aria-label="Search the departure board"
-                autoComplete="off"
-                spellcheck={false}
-                value={query}
-                onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-              />
-            </form>
-          </footer>
+          <footer class="foot">AKTUALISIERT {updated} · SOLL/IST · LIVE</footer>
+          </div>
         </div>
+        {/* search slot: pinned to the stage's second grid row - the board
+            above can grow, shrink, or scroll without this ever moving */}
+        <form class="board-search" onSubmit={(e) => e.preventDefault()}>
+          <input
+            type="search"
+            class="board-search-input"
+            placeholder="SUCHE — search the timetable"
+            aria-label="Search the departure board"
+            autoComplete="off"
+            spellcheck={false}
+            value={query}
+            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+          />
+        </form>
       </div>
     );
   }
