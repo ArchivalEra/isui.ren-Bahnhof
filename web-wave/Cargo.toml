@@ -1,0 +1,31 @@
+[package]
+name = "bahnhof-wave"
+version = "0.1.0"
+edition = "2021"
+description = "GPU theme-transition engine for isui.ren/Bahnhof: radial reveal with a wobbled water rim and convex-lens refraction, driven from two scene snapshots."
+license = "AGPL-3.0"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "Window",
+  "HtmlCanvasElement",
+  "WebGl2RenderingContext",
+  "WebGlShader",
+  "WebGlProgram",
+  "WebGlBuffer",
+  "WebGlVertexArrayObject",
+  "WebGlTexture",
+  "WebGlUniformLocation",
+  "WebGlSync",
+]
+
+[profile.release]
+opt-level = "s"
+lto = true

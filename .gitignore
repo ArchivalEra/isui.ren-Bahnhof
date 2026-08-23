@@ -50,8 +50,15 @@
 # Bahnhof production site (winner: B — live departure board)
 !web-ui/**
 
+# GPU wave transition engine (rust -> wasm)
+!web-wave/**
+
 # Security scanner reports (local artifacts, never shipped)
 web-ui/.mimosa/
+web-wave/.mimosa/
+
+# Cargo build artifacts for the wave engine crate (local, never shipped)
+web-wave/target/
 
 # Generated at build time by web-ui/scripts/gen-destinations.mjs
 web-ui/src/destinations.generated.ts
