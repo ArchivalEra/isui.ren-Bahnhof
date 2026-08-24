@@ -16,7 +16,6 @@ import type { ComponentChildren } from "preact";
 
 const paused = signal(false);
 
-const BAND_W = 240; // rim water width, px
 // ?wavespeed=ms overrides sweep duration - demo/test hook
 const speedParam =
   typeof window !== "undefined"
@@ -68,39 +67,6 @@ function Clock() {
   );
 }
 
-let wobbleDefsReady = false;
-let wobbleMap: SVGFEDisplacementMapElement | null = null;
-/** Inject (once) the turbulence+displacement filter used by the rim. */
-function ensureWobbleFilter(): string {
-  const id = "bahnhof-float";
-  if (wobbleDefsReady || document.getElementById(id)) {
-    wobbleDefsReady = true;
-    return `url(#${id})`;
-  }
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("width", "0");
-  svg.setAttribute("height", "0");
-  svg.style.position = "absolute";
-  svg.innerHTML = `
-    <filter id="${id}" x="-30%" y="-30%" width="160%" height="160%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.011 0.017" numOctaves="2" seed="11" result="n"/>
-      <feDisplacementMap in="SourceGraphic" in2="n" scale="30" xChannelSelector="R" yChannelSelector="G"/>
-    </filter>`;
-  document.body.appendChild(svg);
-  wobbleMap = svg.querySelector("feDisplacementMap");
-  wobbleDefsReady = true;
-  return `url(#${id})`;
-}
-
-const WOBBLE_SCALE = 30;
-/** The flood calms down as it reaches the far edges: displacement fades
- *  to zero over the last stretch so no frayed pixels can survive there. */
-function wobbleScaleAt(t: number): number {
-  const fadeStart = 0.78;
-  if (t <= fadeStart) return WOBBLE_SCALE;
-  return Math.max(0, WOBBLE_SCALE * (1 - (t - fadeStart) / (1 - fadeStart)));
-}
-
 function StatusCell({ d, boarding }: { d: Departure; boarding: boolean }) {
   if (d.state === "departed")
     return (
@@ -124,14 +90,6 @@ function varsOf(p: Profile): Record<string, string> {
   const o: Record<string, string> = {};
   for (const [k, v] of Object.entries(p.tokens)) o[k] = v;
   return o;
-}
-
-/** Annulus as one nonzero-winding path: outer loop clockwise, inner loop
- *  counter-clockwise, so the middle winds to zero and clips away. */
-function ringPath(cx: number, cy: number, rIn: number, rOut: number): string {
-  const loop = (r: number, sweep: number) =>
-    `M ${cx + r} ${cy} A ${r} ${r} 0 1 ${sweep} ${cx - r} ${cy} A ${r} ${r} 0 1 ${sweep} ${cx + r} ${cy} Z`;
-  return `${loop(rOut, 1)} ${loop(Math.max(1, rIn), 0)}`;
 }
 
 interface SwitchAnim {
@@ -230,7 +188,7 @@ export default function Board() {
 
   const orbRef = useRef<HTMLButtonElement>(null);
   const toRef = useRef<HTMLDivElement>(null);
-  const bandRef = useRef<HTMLDivElement>(null);
+  const crestRef = useRef<HTMLDivElement>(null);
   const [anim, setAnim] = useState<SwitchAnim | null>(null);
   const running = useRef(false);
 
@@ -265,10 +223,14 @@ export default function Board() {
         return;
       }
 
-      // GPU engine first: snapshot both scenes, cover the page, and swap
-      // the real DOM underneath while the canvas hides the swap. If the
-      // engine is unavailable we fall through to the CSS three-scene path.
-      if (!reducedMotion && typeof window !== "undefined") {
+      // GPU engine is opt-in while its DOM->texture path is unreliable
+      // (foreignObject rasterization drops modern CSS like color-mix/svh,
+      // producing black corrupted frames): ?engine=wasm to experiment
+      if (
+        !reducedMotion &&
+        typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).has("engine-wasm")
+      ) {
         const stageNode = document.querySelector(".scene-body");
         if (stageNode) {
           const run = await waveEngineStart({
@@ -286,7 +248,6 @@ export default function Board() {
         }
       }
 
-      ensureWobbleFilter();
       const { x: cx, y: cy } = orbOrigin();
       setAnim({ from, to, cx, cy });
 
@@ -317,13 +278,16 @@ export default function Board() {
           const t = Math.min(1, (performance.now() - start) / WAVE_MS);
           const eased = 1 - Math.pow(1 - t, 3);
           const R = Math.max(1, eased * maxR);
-          const cpTo = `circle(${R}px at ${cx}px ${cy}px)`;
-          // inner radius sits below the reveal edge so displacement can
-          // never open a gap between the water ring and the revealed disc
-          const cpBand = `path("${ringPath(cx, cy, R - 24, R + BAND_W)}")`;
-          if (toRef.current) toRef.current.style.clipPath = cpTo;
-          if (bandRef.current) bandRef.current.style.clipPath = cpBand;
-          wobbleMap?.setAttribute("scale", String(wobbleScaleAt(t)));
+          if (toRef.current) toRef.current.style.clipPath = `circle(${R}px at ${cx}px ${cy}px)`;
+          // the crest: a glowing ring riding the wavefront - pure compositor
+          // geometry, no filters, full refresh rate on any machine
+          if (crestRef.current) {
+            const c = crestRef.current;
+            c.style.width = c.style.height = `${R * 2}px`;
+            c.style.left = `${cx - R}px`;
+            c.style.top = `${cy - R}px`;
+            c.style.opacity = String(Math.min(1, (1 - t) * 3 + 0.25));
+          }
             if (t < 1) requestAnimationFrame(frame);
             else resolve();
           };
@@ -533,24 +497,13 @@ export default function Board() {
     );
   }
 
-  // --- switch: three stacked full-page scenes ---
+  // --- switch: two stacked scenes + a glowing crest ring ---
   if (anim) {
     const at = `at ${anim.cx}px ${anim.cy}px`;
     return (
       <>
         <div class="scene scene-from" style={varsOf(anim.from)} aria-hidden="true">
           <Scene profile={anim.from} />
-        </div>
-        {/* filter lives on the wrapper so it displaces the ALREADY clipped
-            ring - both rim edges come out wobbled, not compass-drawn */}
-        <div class="scene scene-band" style={varsOf(anim.to)} aria-hidden="true">
-          <div
-            class="band-clip"
-            ref={bandRef}
-            style={{ clipPath: `circle(0px ${at})` }}
-          >
-            <Scene profile={anim.to} />
-          </div>
         </div>
         <div
           class="scene scene-to"
@@ -559,6 +512,7 @@ export default function Board() {
         >
           <Scene profile={anim.to} />
         </div>
+        <div class="wave-crest" ref={crestRef} aria-hidden="true" />
       </>
     );
   }

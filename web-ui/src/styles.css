@@ -231,21 +231,34 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
 .scene-from { z-index: 1; }
 /* displacement pushes pixels outward: the band must be allowed to spill
    past the viewport instead of being hard-clipped into frayed edges */
-.scene-band { z-index: 2; filter: url(#bahnhof-float); overflow: visible; }
-.band-clip {
-  position: absolute;
-  inset: 0;
-  will-change: clip-path;
-}
+/* NOTE: the SVG displacement filter is GONE on purpose - it rasterized
+   the whole viewport on the CPU every frame (10fps on weak machines).
+   The wavefront is now a glowing crest ring (pure compositor geometry);
+   the GPU wave engine (?engine=wasm) is where true refraction will
+   return once a reliable DOM->texture path exists. */
 .scene-to { z-index: 3; will-change: clip-path; }
+
+/* the crest: a soft glowing ring riding the wavefront */
+.wave-crest {
+  position: fixed;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  border: 2px solid rgba(140, 170, 235, 0.55);
+  box-shadow:
+    0 0 26px rgba(110, 150, 230, 0.45),
+    inset 0 0 20px rgba(140, 170, 235, 0.3);
+  pointer-events: none;
+  z-index: 4;
+  will-change: transform, opacity;
+}
 /* window-on-the-wall layout (heart's window-stage lesson, native edition):
    a fixed-height frame of two rows - an elastic stage that centers the
    board and absorbs all of its growth internally (rows scroll inside,
    never push siblings), and a search slot whose geometry is a pure
    function of this template, so rows coming and going above can never
    move, blur, or interrupt it. 100svh on purpose: stable under toolbars
-   and rotation (dvh is not). */
-.scene-body {
+   and rotation (dvh is not). */.scene-body {
   position: relative;
   height: 100svh;
   display: grid;
