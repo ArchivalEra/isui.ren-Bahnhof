@@ -207,10 +207,7 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   cursor: pointer;
   position: relative;
   overflow: hidden;
-  transition: transform 0.15s ease;
 }
-.theme-orb:hover { transform: scale(1.08); }
-.theme-orb:active { transform: scale(0.94); }
 .theme-orb:focus-visible { outline: 2px solid var(--signal-warn); outline-offset: 3px; }
 /* half-moon glyph: shows the duality of light/dark */
 .orb-half {

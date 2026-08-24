@@ -12,9 +12,36 @@ import { signal } from "@preact/signals";
 import { profiles, currentProfile, setProfile, type Profile } from "./theme";
 import { initialBoard, tickBoard, type Departure, type ScheduleMem } from "./timetable";
 import { waveEngineStart } from "./wave-engine";
-import type { ComponentChildren } from "preact";
+import type { ComponentChildren, RefObject } from "preact";
 
 const paused = signal(false);
+
+/** Module-level on purpose: an in-body component identity would be
+ *  remounted by every per-second Board tick, which used to replay the
+ *  orb's hover animation forever and drop its focus. */
+function ThemeOrb({
+  profile,
+  onSwitch,
+  orbRef,
+}: {
+  profile: Profile;
+  onSwitch: () => void;
+  orbRef: RefObject<HTMLButtonElement>;
+}) {
+  return (
+    <button
+      ref={orbRef}
+      type="button"
+      class="theme-orb"
+      style={{ background: "var(--surface)" }}
+      aria-label={`Switch theme (current: ${profile.label})`}
+      title={`Switch theme (current: ${profile.label})`}
+      onClick={() => onSwitch()}
+    >
+      <span class="orb-half" aria-hidden="true" />
+    </button>
+  );
+}
 
 // ?wavespeed=ms overrides sweep duration - demo/test hook
 const speedParam =
@@ -303,22 +330,6 @@ export default function Board() {
     }
   }
 
-  function ThemeOrb({ profile }: { profile: Profile }) {
-    return (
-      <button
-        ref={orbRef}
-        type="button"
-        class="theme-orb"
-        style={{ background: "var(--surface)" }}
-        aria-label={`Switch theme (current: ${profile.label})`}
-        title={`Switch theme (current: ${profile.label})`}
-        onClick={() => runThemeSwitch()}
-      >
-        <span class="orb-half" aria-hidden="true" />
-      </button>
-    );
-  }
-
   const updated = now.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   // boarding is a display state: only the front row, and only when it
   // genuinely departs within the next two minutes
@@ -416,7 +427,7 @@ export default function Board() {
             <header class="head">
               <h1>ISUI.REN — HAUPTBAHNHOF</h1>
             <div class="controls">
-              <ThemeOrb profile={profile} />
+              <ThemeOrb profile={profile} onSwitch={runThemeSwitch} orbRef={orbRef} />
               <Clock />
               <button
                 type="button"
