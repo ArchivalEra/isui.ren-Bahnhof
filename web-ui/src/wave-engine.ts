@@ -116,8 +116,11 @@ export async function waveEngineStart(opts: {
       pointerEvents: "none",
     } as CSSStyleDeclaration);
 
-    const engine = WaveEngine.new(canvas, fromCanvas, toCanvas, opts.orb.x, opts.orb.y, 240);
+    // mount FIRST: the engine sizes its framebuffer from clientWidth/
+    // clientHeight, which are zero for an unattached canvas - an invisible
+    // engine is exactly the "no animation" bug this order once caused
     document.body.appendChild(canvas);
+    const engine = WaveEngine.new(canvas, fromCanvas, toCanvas, opts.orb.x, opts.orb.y, 240);
 
     const maxR = engine.max_radius(opts.orb.x, opts.orb.y) * 1.02;
     const start = performance.now();

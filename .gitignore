@@ -55,6 +55,7 @@
 
 # Security scanner reports (local artifacts, never shipped)
 web-ui/.mimosa/
+.wayfinder/tickets/.mimosa/
 web-wave/.mimosa/
 
 # Cargo build artifacts for the wave engine crate (local, never shipped)
