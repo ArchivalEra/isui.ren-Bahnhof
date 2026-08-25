@@ -102,8 +102,36 @@ function applyProfile(): void {
   document.documentElement.style.colorScheme = p.dark ? "dark" : "light";
 }
 
+/** User-specified switch cycle: white -> rail blue -> white -> black ->
+ *  white -> (blue again). White appears three times, so "next" is a
+ *  position in THIS sequence, not a lookup by id. */
+const CYCLE = ["heart", "station", "heart", "heart-dark", "heart"];
+let cycleIdx = 0;
+
+function profileOfId(id: string): Profile {
+  return profiles.find((p) => p.id === id) ?? profiles[0];
+}
+
+function syncCycle(id: string): void {
+  const i = CYCLE.lastIndexOf(id);
+  cycleIdx = i >= 0 ? i : 0;
+}
+
+/** The theme the orb previews (and the next click lands on). */
+export function peekNextInCycle(): Profile {
+  const next = CYCLE[(cycleIdx + 1) % CYCLE.length];
+  return profileOfId(next);
+}
+
+/** Advance the cycle and return the theme to switch to. */
+export function advanceCycle(): Profile {
+  cycleIdx = (cycleIdx + 1) % CYCLE.length;
+  return profileOfId(CYCLE[cycleIdx]);
+}
+
 /** Re-applies tokens reactively: profile switches take effect instantly. */
 export function initTheme(): void {
+  syncCycle(currentId.value);
   effect(applyProfile);
   // follow system preference only while the user has not made an explicit choice
   window
@@ -117,6 +145,7 @@ export function initTheme(): void {
       }
       if (!saved) {
         currentId.value = systemPreference();
+        syncCycle(currentId.value);
       }
     });
 }
