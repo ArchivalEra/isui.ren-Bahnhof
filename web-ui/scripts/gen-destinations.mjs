@@ -59,7 +59,7 @@ const patterns = loadBlacklist(blacklistFile);
 const destinations = slugs
   .filter((slug) => !isBlocked(slug, patterns))
   .sort((a, b) => a.localeCompare(b))
-  .map((slug) => ({ slug, label: labelOf(slug), href: `/${slug}/` }));
+  .map((slug) => ({ slug, label: labelOf(slug), href: `/${slug}` }));
 
 const body = `// GENERATED at build time by scripts/gen-destinations.mjs - do not edit.
 // Source of truth: live page directories on the heart deploy branch,
