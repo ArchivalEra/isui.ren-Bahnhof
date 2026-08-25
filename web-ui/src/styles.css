@@ -116,6 +116,18 @@ body {
   opacity: 0.35;
   transition: opacity 700ms ease;
 }
+/* search: non-matching rows sink back without leaving the stage */
+.board tbody tr.dim {
+  opacity: 0.14;
+  transition: opacity 350ms ease;
+}
+.board tbody td.no-match {
+  text-align: center;
+  color: var(--on-surface-variant);
+  letter-spacing: 0.08em;
+  font-weight: 400;
+  padding: 1.2rem 0.8rem;
+}
 
 .badge {
   display: inline-block;
@@ -209,13 +221,6 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   overflow: hidden;
 }
 .theme-orb:focus-visible { outline: 2px solid var(--signal-warn); outline-offset: 3px; }
-/* half-moon glyph: shows the duality of light/dark */
-.orb-half {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, rgba(17,17,17,0.55) 0 50%, transparent 50%);
-}
-
 /* radial theme wave: three stacked full-page scenes.
    The band wrapper carries the displacement filter so it warps the
    already-clipped ring below it - clip first, then displace. */

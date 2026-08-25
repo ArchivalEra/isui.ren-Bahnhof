@@ -9,7 +9,7 @@
 // growing circle from the orb. Everything crosses the arc together.
 import { useEffect, useRef, useState, useLayoutEffect } from "preact/hooks";
 import { signal } from "@preact/signals";
-import { profiles, currentProfile, setProfile, type Profile } from "./theme";
+import { currentProfile, setProfile, peekNextInCycle, advanceCycle, type Profile } from "./theme";
 import { initialBoard, tickBoard, type Departure, type ScheduleMem } from "./timetable";
 import { waveEngineStart } from "./wave-engine";
 import type { ComponentChildren, RefObject } from "preact";
@@ -18,13 +18,14 @@ const paused = signal(false);
 
 /** Module-level on purpose: an in-body component identity would be
  *  remounted by every per-second Board tick, which used to replay the
- *  orb's hover animation forever and drop its focus. */
+ *  orb's hover animation forever and drop its focus. The orb previews
+ *  the NEXT theme in the cycle - its fill is that theme's surface. */
 function ThemeOrb({
-  profile,
+  next,
   onSwitch,
   orbRef,
 }: {
-  profile: Profile;
+  next: Profile;
   onSwitch: () => void;
   orbRef: RefObject<HTMLButtonElement>;
 }) {
@@ -33,12 +34,11 @@ function ThemeOrb({
       ref={orbRef}
       type="button"
       class="theme-orb"
-      style={{ background: "var(--surface)" }}
-      aria-label={`Switch theme (current: ${profile.label})`}
-      title={`Switch theme (current: ${profile.label})`}
+      style={{ background: next.tokens["--surface"] }}
+      aria-label={`Switch theme (next: ${next.label})`}
+      title={`Switch theme (next: ${next.label})`}
       onClick={() => onSwitch()}
     >
-      <span class="orb-half" aria-hidden="true" />
     </button>
   );
 }
@@ -242,8 +242,7 @@ export default function Board() {
     running.current = true;
     try {
       const from = currentProfile();
-      const idx = profiles.findIndex((p) => p.id === from.id);
-      const to = profiles[(idx + 1) % profiles.length];
+      const to = advanceCycle();
 
       if (reducedMotion) {
         setProfile(to.id);
@@ -339,6 +338,17 @@ export default function Board() {
     front.state !== "cancelled" &&
     front.state !== "departed" &&
     front.departsAtMs - now.getTime() <= 120_000;
+
+  // search-as-index: rows that do not match fade instead of leaving, so
+  // the board keeps its size and nothing under the user's finger moves
+  const q = query.trim().toLowerCase();
+  const qCompact = q.replace(/\s+/g, "");
+  const matchesQuery = (d: Departure) =>
+    !q ||
+    d.dest.toLowerCase().includes(q) ||
+    d.train.toLowerCase().replace(/\s+/g, "").includes(qCompact) ||
+    d.platform.includes(q);
+  const anyMatch = !q || board.some(matchesQuery);
   const cur = currentProfile();
 
   /** One complete page: hall + furniture + board. */
@@ -427,7 +437,7 @@ export default function Board() {
             <header class="head">
               <h1>ISUI.REN — HAUPTBAHNHOF</h1>
             <div class="controls">
-              <ThemeOrb profile={profile} onSwitch={runThemeSwitch} orbRef={orbRef} />
+              <ThemeOrb next={peekNextInCycle()} onSwitch={runThemeSwitch} orbRef={orbRef} />
               <Clock />
               <button
                 type="button"
@@ -461,7 +471,15 @@ export default function Board() {
                 return (
                   <tr
                     key={d.id}
-                    class={leaving ? "gone" : boarding ? "now" : ""}
+                    class={
+                      leaving
+                        ? "gone"
+                        : boarding
+                          ? "now"
+                          : matchesQuery(d)
+                            ? ""
+                            : "dim"
+                    }
                   >
                     <td class={d.state === "cancelled" ? "cxl" : ""}>
                       <span>{d.time}</span>
@@ -484,6 +502,15 @@ export default function Board() {
                   </tr>
                 );
               })}
+              {!anyMatch && (
+                <tfoot>
+                  <tr>
+                    <td colSpan={6} class="no-match">
+                      KEIN TREFFER — nothing on the board matches “{query.trim()}”
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
             </tbody>
           </table>
 
