@@ -113,7 +113,9 @@ function profileOfId(id: string): Profile {
 }
 
 function syncCycle(id: string): void {
-  const i = CYCLE.lastIndexOf(id);
+  // first occurrence: starting from white lands on rail blue next
+  // (lastIndexOf would start from the trailing white -> white->white)
+  const i = CYCLE.indexOf(id);
   cycleIdx = i >= 0 ? i : 0;
 }
 
