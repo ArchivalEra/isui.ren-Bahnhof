@@ -14,7 +14,7 @@
 // Also reads every <slug>/posts.json it finds across all sub-site
 // directories and emits FEED_ITEMS: all items from all feeds are merged
 // into a single pool, each projected as a scheduled departure on the
-// board (see docs/board-feed-contract.md).
+// board (see ArchivalEra/isui.ren-heart/docs/board-feed-contract.md).
 
 import { readdirSync, statSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
