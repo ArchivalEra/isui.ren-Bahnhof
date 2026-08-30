@@ -10,7 +10,7 @@
 // All randomness is deterministic per slot, so the same train is always
 // the same train.
 
-import { DESTINATIONS } from "./destinations.generated";
+import { DESTINATIONS, FEED_ITEMS } from "./destinations.generated";
 
 export const MAX_ROWS = 12; // absolute ceiling across all destinations
 export const LINGER_MS = 3000; // how long a due row holds before leaving
@@ -29,6 +29,9 @@ const REMARKS = [
 ];
 
 const TRAINS = ["S 3", "RE 7", "IC 221", "RB 12", "RE 4", "IC 44", "S 9", "RE 2"];
+
+const FEED_TRAINS = ["D 1", "D 2", "D 3", "D 4", "D 5", "D 6", "D 7", "D 8"];
+const FEED_OFFSET = 1000; // destIdx base for feed items (non-conflicting with real destinations)
 
 /** Deterministic pseudo-random in [0,1) from an integer seed. */
 function rand(seed: number): number {
@@ -92,11 +95,30 @@ function destOf(destIdx: number): { label: string; href: string } {
 }
 
 function materialize(sp: Spawn): Departure {
+  const isFeed = sp.destIdx >= FEED_OFFSET;
   const d = new Date(sp.departsAtMs);
   // scheduled HH:MM in the VISITOR's timezone and locale - a departure
   // at the same instant reads 17:44 in Berlin and 5:44 PM in New York,
   // each matching what their desktop clock shows
   const hhmm = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+
+  if (isFeed) {
+    const fi = FEED_ITEMS[sp.destIdx - FEED_OFFSET];
+    return {
+      id: `${fi.slug}-feed-${sp.slot}`,
+      destIdx: sp.destIdx,
+      time: hhmm,
+      departsAtMs: sp.departsAtMs,
+      train: FEED_TRAINS[(sp.destIdx + sp.slot) % FEED_TRAINS.length],
+      dest: fi.title,
+      destHref: fi.url,
+      platform: String(1 + Math.floor(rand(sp.slot * 5.13 + sp.destIdx) * 3)),
+      state: "ontime",
+      remark: fi.desc ?? undefined,
+      cancelAtMs: undefined,
+      removalAt: undefined,
+    };
+  }
 
   const r = rand(sp.slot * 7.13 + sp.destIdx * 11.17);
   let state: Departure["state"] = "ontime";
@@ -159,7 +181,8 @@ function nextSpawnAfter(
 }
 
 /** Initial board: every discovered destination gets up to two trains,
- *  honoring the gap discipline. Also seeds the scheduler memory. */
+ *  honoring the gap discipline. Also seeds the scheduler memory.
+ *  Feed items are each scheduled once at a deterministic time. */
 export function initialBoard(now: Date): { rows: Departure[]; mem: ScheduleMem } {
   anchorMs = now.getTime();
   const mem: ScheduleMem = {};
@@ -172,6 +195,20 @@ export function initialBoard(now: Date): { rows: Departure[]; mem: ScheduleMem }
       mem[di] = { slot: spawn.slot, ms: spawn.departsAtMs };
       spawn = nextSpawnAfter(mem[di], di);
     }
+  }
+
+  // schedule feed items: each gets a deterministic departure based on
+  // its URL hash, spread across 5 hours from now
+  for (let fi = 0; fi < FEED_ITEMS.length; fi++) {
+    const di = FEED_OFFSET + fi;
+    // deterministic offset from now: hash of the URL
+    const urlHash = Math.abs(
+      FEED_ITEMS[fi].url.split("").reduce((h: number, c: string) => (h * 31 + c.charCodeAt(0)) | 0, 0),
+    );
+    const ms = anchorMs + 120_000 + (urlHash % (18_000_000 - 120_000));
+    mem[di] = { slot: 1, ms };
+    const spawn: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
+    rows.push(materialize(spawn));
   }
 
   rows.sort((a, b) => a.departsAtMs - b.departsAtMs);
@@ -251,6 +288,20 @@ export function tickBoard(
     for (let di = 0; di < Math.max(1, DESTINATIONS.length); di++) {
       if ((counts.get(di) ?? 0) >= ON_BOARD_PER_DEST) continue;
       const sp = nextSpawnAfter(mem[di], di);
+      if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
+    }
+    // feed items are single-shot: each departs exactly once, scheduled
+    // deterministically from its URL hash. Only schedule items not yet
+    // in the memory (i.e. not yet scheduled this session).
+    for (let fi = 0; fi < FEED_ITEMS.length; fi++) {
+      const di = FEED_OFFSET + fi;
+      if (mem[di]) continue; // already scheduled
+      if ((counts.get(di) ?? 0) > 0) continue; // already on the board
+      const urlHash = Math.abs(
+        FEED_ITEMS[fi].url.split("").reduce((h: number, c: string) => (h * 31 + c.charCodeAt(0)) | 0, 0),
+      );
+      const ms = anchorMs + 120_000 + (urlHash % (18_000_000 - 120_000));
+      const sp: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
       if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
     }
     if (!chosen) break;

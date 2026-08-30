@@ -10,6 +10,11 @@
 // filtered result. If the deploy checkout is missing (local dev), the
 // script falls back to the single known destination (heart) so builds
 // never break.
+//
+// Also reads every <slug>/posts.json it finds across all sub-site
+// directories and emits FEED_ITEMS: all items from all feeds are merged
+// into a single pool, each projected as a scheduled departure on the
+// board (see docs/board-feed-contract.md).
 
 import { readdirSync, statSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import path from "node:path";
@@ -61,6 +66,34 @@ const destinations = slugs
   .sort((a, b) => a.localeCompare(b))
   .map((slug) => ({ slug, label: labelOf(slug), href: `/${slug}` }));
 
+// -- Feed items: read every posts.json across all sub-site directories --
+const feedItems = [];
+if (deployDir && existsSync(deployDir)) {
+  for (const slug of slugs) {
+    if (isBlocked(slug, patterns)) continue;
+    const feedPath = path.join(deployDir, slug, "posts.json");
+    if (!existsSync(feedPath)) continue;
+    try {
+      const raw = readFileSync(feedPath, "utf8");
+      const items = JSON.parse(raw);
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          if (item.title && item.url) {
+            feedItems.push({
+              title: item.title,
+              url: item.url,
+              desc: item.desc ?? null,
+              slug,
+            });
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[gen-destinations] skipping bad posts.json in ${slug}:`, e.message);
+    }
+  }
+}
+
 const body = `// GENERATED at build time by scripts/gen-destinations.mjs - do not edit.
 // Source of truth: live page directories on the heart deploy branch,
 // minus everything the build-time blacklist filters out. The blacklist
@@ -72,7 +105,16 @@ export interface Destination {
   href: string;
 }
 
+export interface FeedItem {
+  title: string;
+  url: string;
+  desc: string | null;
+  slug: string;
+}
+
 export const DESTINATIONS: Destination[] = ${JSON.stringify(destinations, null, 2)};
+
+export const FEED_ITEMS: FeedItem[] = ${JSON.stringify(feedItems, null, 2)};
 `;
 writeFileSync(outFile, body);
-console.log(`[gen-destinations] board destinations: ${destinations.map((d) => d.label).join(", ") || "(none)"}`);
+console.log(`[gen-destinations] ${destinations.length} destinations, ${feedItems.length} feed items`);

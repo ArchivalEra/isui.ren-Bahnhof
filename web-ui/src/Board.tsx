@@ -13,7 +13,6 @@ import { currentProfile, setProfile, peekNextInCycle, advanceCycle, type Profile
 import { initialBoard, tickBoard, type Departure, type ScheduleMem } from "./timetable";
 import { DESTINATIONS } from "./destinations.generated";
 import { waveEngineStart } from "./wave-engine";
-import { loadFeeds, searchFeeds, type FeedItem } from "./feed-reader";
 import type { ComponentChildren, RefObject } from "preact";
 
 const paused = signal(false);
@@ -141,11 +140,6 @@ export default function Board() {
   // search-as-index: the input is live UI first, the index system plugs
   // into `query` later
   const [query, setQuery] = useState("");
-  // runtime feed cache: loaded once per session from all known destinations
-  const [feeds, setFeeds] = useState<Record<string, FeedItem[]> | null>(null);
-  useEffect(() => {
-    loadFeeds(DESTINATIONS.map((d) => d.slug)).then(setFeeds);
-  }, []);
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -356,9 +350,6 @@ export default function Board() {
     d.train.toLowerCase().replace(/\s+/g, "").includes(qCompact) ||
     d.platform.includes(q);
   const anyMatch = !q || board.some(matchesQuery);
-  // feed search: union of timetable row matches and feed item matches
-  const feedHits = feeds && q ? searchFeeds(feeds, q) : [];
-  const allMatch = anyMatch || feedHits.length > 0;
   const cur = currentProfile();
 
   /** One complete page: hall + furniture + board. */
@@ -512,29 +503,13 @@ export default function Board() {
                   </tr>
                 );
               })}
-              {!allMatch && (
+              {!anyMatch && (
                 <tfoot>
                   <tr>
                     <td colSpan={6} class="no-match">
                       KEIN TREFFER — nothing on the board matches “{query.trim()}”
                     </td>
                   </tr>
-                </tfoot>
-              )}
-              {feedHits.length > 0 && (
-                <tfoot>
-                  {feedHits.slice(0, 5).map((hit) => (
-                    <tr key={hit.url} class="feed-hit">
-                      <td colSpan={2} />
-                      <td>
-                        <a href={hit.url}>{hit.title}</a>
-                      </td>
-                      <td colSpan={1} class="feed-source">{hit.slug}</td>
-                      <td colSpan={2} class="remark-col">
-                        {hit.desc ?? ""}
-                      </td>
-                    </tr>
-                  ))}
                 </tfoot>
               )}
             </tbody>
