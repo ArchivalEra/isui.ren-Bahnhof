@@ -47,14 +47,16 @@ export async function fetchAllFeeds(): Promise<FeedItem[]> {
     const fallback = await fetchOne("/heart");
     all.push(...fallback);
   }
-  // deduplicate by URL (first wins), keep stable order (sorted by url for deterministic hash)
-  const seen = new Set<string>();
+  // deduplicate by URL and by NACH (title) — no duplicate NACH on board
+  const seenUrl = new Set<string>();
+  const seenTitle = new Set<string>();
   const deduped: FeedItem[] = [];
   for (const fi of all) {
-    if (!seen.has(fi.url)) {
-      seen.add(fi.url);
-      deduped.push(fi);
-    }
+    const titleKey = fi.title.trim().toLowerCase();
+    if (seenUrl.has(fi.url) || seenTitle.has(titleKey)) continue;
+    seenUrl.add(fi.url);
+    seenTitle.add(titleKey);
+    deduped.push(fi);
   }
   // keep Blog contract order (date desc) but ensure deterministic for hashing?
   // The feed source already sorts by date desc; we preserve that order.

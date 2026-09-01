@@ -8,7 +8,6 @@
 // wobbled rim (SVG displacement), target colors revealed inside the
 // growing circle from the orb. Everything crosses the arc together.
 import { useEffect, useRef, useState, useLayoutEffect, useMemo } from "preact/hooks";
-import { signal } from "@preact/signals";
 import { memo } from "preact/compat";
 import { currentProfile, setProfile, peekNextInCycle, advanceCycle, type Profile } from "./theme";
 import {
@@ -16,6 +15,7 @@ import {
   tickBoard,
   refreshFuture,
   forceRegenerate,
+  shiftBoard,
   getFeedItems,
   setFeedItems,
   type Departure,
@@ -26,10 +26,6 @@ import { waveEngineStart } from "./wave-engine";
 import { startFeedWatcher } from "./feed-watcher";
 import type { ComponentChildren, RefObject } from "preact";
 
-/** Time-travel offset for the station clock (replaces the old pause toggle).
- *  In-memory only — a hard refresh (window.location.reload) naturally resets
- *  it to 0 (real time). The base ?clock param from the URL remains. */
-const timeOffset = signal(0);
 const TIME_STEP_MS = 15 * 60_000; // 15 min per click — matches MIN_GAP_MS
 
 /** Module-level on purpose: an in-body component identity would be
@@ -170,7 +166,7 @@ const CLOCK_OFFSET = (() => {
   return Number.isFinite(secs) && secs !== 0 ? secs * 1000 : 0;
 })();
 function stationNow(): Date {
-  return new Date(Date.now() + CLOCK_OFFSET + timeOffset.value);
+  return new Date(Date.now() + CLOCK_OFFSET);
 }
 
 /** Isolated live clock: re-renders itself every second, nothing else. */
@@ -287,12 +283,15 @@ export default function Board() {
   }
 
   function nudgeTime(deltaMs: number) {
-    timeOffset.value += deltaMs;
+    // “see further timetable” — shift the visible window, not the clock.
+    // Departure ZEIT stays absolute; we only change which rows are shown,
+    // like refreshing a recommendation list. Hard refresh naturally resets.
     const t = stationNow();
-    // time travel invalidates the old schedule — rebuild from the new now
-    const r = forceRegenerate(t);
-    memRef.current = r.mem;
-    setBoard(r.rows);
+    setBoard((prev) => {
+      const r = shiftBoard(prev, t, memRef.current, deltaMs);
+      memRef.current = r.mem;
+      return r.rows;
+    });
     setNow(t);
   }
 

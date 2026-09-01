@@ -28,6 +28,11 @@ export interface FeedItem {
   slug: string;
 }
 
+const TRAINS = ["S 3", "RE 7", "IC 221", "RB 12", "RE 4", "IC 44", "S 9", "RE 2"];
+
+const FEED_TRAINS = ["D 1", "D 2", "D 3", "D 4", "D 5", "D 6", "D 7", "D 8"];
+const FEED_OFFSET = 1000; // destIdx base for feed items (non-conflicting with real destinations)
+
 // runtime-mutable feed store (build-time INITIAL_FEEDS is the fallback)
 let _feeds: FeedItem[] = INITIAL_FEEDS as FeedItem[];
 const _feedMap = new Map<number, FeedItem>();
@@ -43,10 +48,14 @@ function feedDestIdxFor(url: string): number {
 
 function rebuildFeedMap(): void {
   _feedMap.clear();
+  const seenTitle = new Set<string>();
   for (const fi of _feeds) {
+    const titleKey = fi.title.trim().toLowerCase();
+    if (seenTitle.has(titleKey)) continue; // no duplicate NACH (user explicitly forbids)
     const di = feedDestIdxFor(fi.url);
-    // first wins on collision (extremely rare); keeps destIdx stable
-    if (!_feedMap.has(di)) _feedMap.set(di, fi);
+    if (_feedMap.has(di)) continue; // destIdx collision (extremely rare)
+    seenTitle.add(titleKey);
+    _feedMap.set(di, fi);
   }
 }
 rebuildFeedMap();
@@ -72,11 +81,6 @@ const REMARKS = [
   "WLAN",
   "Kinderwagen",
 ];
-
-const TRAINS = ["S 3", "RE 7", "IC 221", "RB 12", "RE 4", "IC 44", "S 9", "RE 2"];
-
-const FEED_TRAINS = ["D 1", "D 2", "D 3", "D 4", "D 5", "D 6", "D 7", "D 8"];
-const FEED_OFFSET = 1000; // destIdx base for feed items (non-conflicting with real destinations)
 
 /** Deterministic pseudo-random in [0,1) from an integer seed. */
 function rand(seed: number): number {
@@ -479,4 +483,82 @@ export function refreshFuture(
   }
 
   return changed ? { rows, mem, changed } : { rows: prev, mem: memIn, changed: false };
+}
+
+/**
+ * Shift the visible window by `deltaMs` without moving the station clock.
+ * +delta = see further future (drop the soonest departures, refill tail);
+ * -delta = rewind to see earlier departures (regenerate from an earlier now).
+ * Departure ZEIT stays absolute — only the set of rows changes, like
+ * refreshing a recommendation list.
+ */
+export function shiftBoard(
+  prev: Departure[],
+  now: Date,
+  memIn: ScheduleMem,
+  deltaMs: number,
+): TickResult {
+  const t = now.getTime();
+  anchorMs = t;
+  if (deltaMs === 0) return { rows: prev, mem: memIn, changed: false };
+
+  if (deltaMs > 0) {
+    // forward: drop anything that would depart within the next delta,
+    // keep the rest (still absolute times), then refill the tail.
+    const cutoff = t + deltaMs;
+    const kept = prev.filter((r) => r.departsAtMs > cutoff);
+    // keep mem for dropped dests (so next stays beyond), drop mem for
+    // dropped feeds (so they can be rescheduled) — same as refreshFuture
+    const mem: ScheduleMem = { ...memIn };
+    const droppedIdx = new Set(prev.filter((r) => r.departsAtMs <= cutoff).map((r) => r.destIdx));
+    const liveFeedIdx = new Set(getFeedItems().map((fi) => feedDestIdxFor(fi.url)));
+    for (const di of droppedIdx) {
+      if (di >= FEED_OFFSET) {
+        // feed beyond window was dropped — allow reschedule (if still live)
+        if (liveFeedIdx.has(di)) delete mem[di];
+        else delete mem[di];
+      }
+    }
+    // also drop mem for feeds that no longer exist
+    for (const k of Object.keys(mem)) {
+      const di = Number(k);
+      if (di >= FEED_OFFSET && !liveFeedIdx.has(di)) delete mem[di];
+    }
+    // refill from kept
+    let rows = kept.slice().sort((a, b) => a.departsAtMs - b.departsAtMs);
+    let changed = kept.length !== prev.length;
+    let guard = 0;
+    while (rows.length < MAX_ROWS && guard++ < 50) {
+      const counts = new Map<number, number>();
+      for (const r of rows) counts.set(r.destIdx, (counts.get(r.destIdx) ?? 0) + 1);
+      let chosen: { di: number; spawn: Spawn } | null = null;
+      for (let di = 0; di < Math.max(1, DESTINATIONS.length); di++) {
+        if ((counts.get(di) ?? 0) >= ON_BOARD_PER_DEST) continue;
+        const sp = nextSpawnAfter(mem[di], di);
+        if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
+      }
+      for (const fi of getFeedItems()) {
+        const di = feedDestIdxFor(fi.url);
+        if (!_feedMap.has(di)) continue;
+        if (mem[di]) continue;
+        if ((counts.get(di) ?? 0) > 0) continue;
+        const h = hashStr(fi.url);
+        const ms = anchorMs + 120_000 + (h % (18_000_000 - 120_000));
+        const sp: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
+        if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
+      }
+      if (!chosen) break;
+      rows = [...rows, materialize(chosen.spawn)].sort((a, b) => a.departsAtMs - b.departsAtMs);
+      mem[chosen.di] = { slot: chosen.spawn.slot, ms: chosen.spawn.departsAtMs };
+      changed = true;
+    }
+    return { rows, mem, changed };
+  } else {
+    // rewind: show the timetable as it looked delta ago (including
+    // departures that have since left). No filtering to future — the
+    // user explicitly asked to rewind.
+    const earlier = new Date(t + deltaMs);
+    const regenerated = initialBoard(earlier);
+    return { rows: regenerated.rows, mem: regenerated.mem, changed: true };
+  }
 }
