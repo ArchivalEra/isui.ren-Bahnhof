@@ -128,12 +128,14 @@ body {
   opacity: 0.14;
   transition: opacity 350ms ease;
 }
-.board tbody td.no-match {
+.board td.no-match,
+.board tfoot td.no-match {
   text-align: center;
   color: var(--on-surface-variant);
   letter-spacing: 0.08em;
   font-weight: 400;
-  padding: 1.2rem 0.8rem;
+  padding: 1.4rem 0.8rem;
+  vertical-align: middle;
 }
 
 .badge {
