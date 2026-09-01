@@ -139,6 +139,167 @@ function HallDecor() {
 const HallDecorMemo = memo(HallDecor);
 const ThemeOrbMemo = memo(ThemeOrb);
 
+const SearchInput = memo(function SearchInput({
+  query,
+  setQuery,
+}: {
+  query: string;
+  setQuery: (v: string) => void;
+}) {
+  return (
+    <form class="board-search" onSubmit={(e) => e.preventDefault()}>
+      <input
+        type="search"
+        class="board-search-input"
+        placeholder="SUCHE — search the timetable"
+        aria-label="Search the departure board"
+        autoComplete="off"
+        spellcheck={false}
+        value={query}
+        onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+      />
+    </form>
+  );
+});
+
+// Stable Scene — defined outside Board so its identity never changes
+// and the search input inside is diffed, not remounted, on every tick.
+const Scene = memo(function Scene({
+  profile,
+  vars,
+  board,
+  query,
+  setQuery,
+  now,
+  updated,
+  frontBoards,
+  matchesQuery,
+  anyMatch,
+  tbodyRef,
+  orbRef,
+  nextProfile,
+  runThemeSwitch,
+  nudgeTime,
+}: {
+  profile: Profile;
+  vars?: Record<string, string>;
+  board: Departure[];
+  query: string;
+  setQuery: (v: string) => void;
+  now: Date;
+  updated: string;
+  frontBoards: boolean;
+  matchesQuery: (d: Departure) => boolean;
+  anyMatch: boolean;
+  tbodyRef: RefObject<HTMLTableSectionElement>;
+  orbRef: RefObject<HTMLButtonElement>;
+  nextProfile: Profile;
+  runThemeSwitch: () => void;
+  nudgeTime: (delta: number) => void;
+}) {
+  const v = vars ?? varsOf(profile);
+  return (
+    <div class="scene-body" style={v}>
+      <HallDecorMemo />
+      <div class="stage">
+        <div class="wrap">
+          <header class="head">
+            <h1>ISUI.REN — HAUPTBAHNHOF</h1>
+            <div class="controls">
+              <ThemeOrbMemo next={nextProfile} onSwitch={runThemeSwitch} orbRef={orbRef} />
+              <Clock />
+              <button
+                type="button"
+                class="time-nudge"
+                aria-label="Rewind 15 minutes"
+                title="Rewind 15 minutes"
+                onClick={() => nudgeTime(-TIME_STEP_MS)}
+              >
+                −15
+              </button>
+              <button
+                type="button"
+                class="time-nudge"
+                aria-label="Fast-forward 15 minutes"
+                title="Fast-forward 15 minutes (hard refresh resets to real time)"
+                onClick={() => nudgeTime(TIME_STEP_MS)}
+              >
+                +15
+              </button>
+            </div>
+          </header>
+
+          <table class="board">
+            <thead>
+              <tr>
+                <th scope="col">ZEIT</th>
+                <th scope="col">ZUG</th>
+                <th scope="col">NACH</th>
+                <th scope="col">GLEIS</th>
+                <th scope="col">STATUS</th>
+                <th scope="col" class="remark-col">BEMERKUNG</th>
+              </tr>
+            </thead>
+            <tbody ref={tbodyRef}>
+              {board.map((d, i) => {
+                const boarding = i === 0 && frontBoards;
+                const leaving =
+                  d.state === "departed" ||
+                  (d.state === "cancelled" && !!d.removalAt);
+                return (
+                  <tr
+                    key={d.id}
+                    class={
+                      leaving
+                        ? "gone"
+                        : boarding
+                          ? "now"
+                          : matchesQuery(d)
+                            ? ""
+                            : "dim"
+                    }
+                  >
+                    <td class={d.state === "cancelled" ? "cxl" : ""}>
+                      <span>{d.time}</span>
+                    </td>
+                    <td>
+                      <span class={"badge b-" + d.train.replace(/\s+/g, "-").toLowerCase()}>
+                        {d.train}
+                      </span>
+                    </td>
+                    <td>
+                      <a href={d.destHref}>{d.dest}</a>
+                    </td>
+                    <td>
+                      <span>{d.platform}</span>
+                    </td>
+                    <td><StatusCell d={d} boarding={boarding} /></td>
+                    <td class="remark-col">
+                      <span>{d.remark ?? ""}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+              {!anyMatch && (
+                <tfoot>
+                  <tr>
+                    <td colSpan={6} class="no-match">
+                      KEIN TREFFER — nothing on the board matches “{query.trim()}”
+                    </td>
+                  </tr>
+                </tfoot>
+              )}
+            </tbody>
+          </table>
+
+          <footer class="foot">AKTUALISIERT {updated} · SOLL/IST · LIVE</footer>
+        </div>
+      </div>
+      <SearchInput query={query} setQuery={setQuery} />
+    </div>
+  );
+});
+
 // ?wavespeed=ms overrides sweep duration - demo/test hook
 const speedParam =
   typeof window !== "undefined"
@@ -518,145 +679,73 @@ export default function Board() {
   const nextProfile = useMemo(() => peekNextInCycle(), [cur.id]);
   const profileVars = useMemo(() => varsOf(cur), [cur.id]);
 
-  /** One complete page: hall + furniture + board. */
-  function Scene({ profile, vars }: { profile: Profile; vars?: Record<string, string> }) {
-    const v = vars ?? varsOf(profile);
-    return (
-      <div class="scene-body" style={v}>
-        <HallDecorMemo />
-        {/* elastic stage: the board centers here and absorbs all growth
-            internally - the search slot below never moves */}
-        <div class="stage">
-          <div class="wrap">
-            <header class="head">
-              <h1>ISUI.REN — HAUPTBAHNHOF</h1>
-            <div class="controls">
-              <ThemeOrbMemo next={nextProfile} onSwitch={runThemeSwitch} orbRef={orbRef} />
-              <Clock />
-              <button
-                type="button"
-                class="time-nudge"
-                aria-label="Rewind 15 minutes"
-                title="Rewind 15 minutes"
-                onClick={() => nudgeTime(-TIME_STEP_MS)}
-              >
-                −15
-              </button>
-              <button
-                type="button"
-                class="time-nudge"
-                aria-label="Fast-forward 15 minutes"
-                title="Fast-forward 15 minutes (hard refresh resets to real time)"
-                onClick={() => nudgeTime(TIME_STEP_MS)}
-              >
-                +15
-              </button>
-            </div>
-          </header>
-
-          <table class="board">
-            <thead>
-              <tr>
-                <th scope="col">ZEIT</th>
-                <th scope="col">ZUG</th>
-                <th scope="col">NACH</th>
-                <th scope="col">GLEIS</th>
-                <th scope="col">STATUS</th>
-                <th scope="col" class="remark-col">BEMERKUNG</th>
-              </tr>
-            </thead>
-            <tbody ref={tbodyRef}>
-              {board.map((d, i) => {
-                const boarding = i === 0 && frontBoards;
-                const leaving =
-                  d.state === "departed" ||
-                  (d.state === "cancelled" && !!d.removalAt);
-                return (
-                  <tr
-                    key={d.id}
-                    class={
-                      leaving
-                        ? "gone"
-                        : boarding
-                          ? "now"
-                          : matchesQuery(d)
-                            ? ""
-                            : "dim"
-                    }
-                  >
-                    <td class={d.state === "cancelled" ? "cxl" : ""}>
-                      <span>{d.time}</span>
-                    </td>
-                    <td>
-                      <span class={"badge b-" + d.train.replace(/\s+/g, "-").toLowerCase()}>
-                        {d.train}
-                      </span>
-                    </td>
-                    <td>
-                      <a href={d.destHref}>{d.dest}</a>
-                    </td>
-                    <td>
-                      <span>{d.platform}</span>
-                    </td>
-                    <td><StatusCell d={d} boarding={boarding} /></td>
-                    <td class="remark-col">
-                      <span>{d.remark ?? ""}</span>
-                    </td>
-                  </tr>
-                );
-              })}
-              {!anyMatch && (
-                <tfoot>
-                  <tr>
-                    <td colSpan={6} class="no-match">
-                      KEIN TREFFER — nothing on the board matches “{query.trim()}”
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </tbody>
-          </table>
-
-          <footer class="foot">AKTUALISIERT {updated} · SOLL/IST · LIVE</footer>
-          </div>
-        </div>
-        {/* search slot: pinned to the stage's second grid row - the board
-            above can grow, shrink, or scroll without this ever moving */}
-        <form class="board-search" onSubmit={(e) => e.preventDefault()}>
-          <input
-            type="search"
-            class="board-search-input"
-            placeholder="SUCHE — search the timetable"
-            aria-label="Search the departure board"
-            autoComplete="off"
-            spellcheck={false}
-            value={query}
-            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-          />
-        </form>
-      </div>
-    );
-  }
-
   // --- switch: two stacked scenes + a glowing crest ring ---
   if (anim) {
     const at = `at ${anim.cx}px ${anim.cy}px`;
     return (
       <>
         <div class="scene scene-from" style={varsOf(anim.from)} aria-hidden="true">
-          <Scene profile={anim.from} />
+          <Scene
+            profile={anim.from}
+            board={board}
+            query={query}
+            setQuery={setQuery}
+            now={now}
+            updated={updated}
+            frontBoards={frontBoards}
+            matchesQuery={matchesQuery}
+            anyMatch={anyMatch}
+            tbodyRef={tbodyRef}
+            orbRef={orbRef}
+            nextProfile={nextProfile}
+            runThemeSwitch={runThemeSwitch}
+            nudgeTime={nudgeTime}
+          />
         </div>
         <div
           class="scene scene-to"
           ref={toRef}
           style={{ ...varsOf(anim.to), clipPath: `circle(0px ${at})` }}
         >
-          <Scene profile={anim.to} />
+          <Scene
+            profile={anim.to}
+            board={board}
+            query={query}
+            setQuery={setQuery}
+            now={now}
+            updated={updated}
+            frontBoards={frontBoards}
+            matchesQuery={matchesQuery}
+            anyMatch={anyMatch}
+            tbodyRef={tbodyRef}
+            orbRef={orbRef}
+            nextProfile={nextProfile}
+            runThemeSwitch={runThemeSwitch}
+            nudgeTime={nudgeTime}
+          />
         </div>
         <div class="wave-crest" ref={crestRef} aria-hidden="true" />
       </>
     );
   }
 
-  return <Scene profile={cur} vars={profileVars} />;
+  return (
+    <Scene
+      profile={cur}
+      vars={profileVars}
+      board={board}
+      query={query}
+      setQuery={setQuery}
+      now={now}
+      updated={updated}
+      frontBoards={frontBoards}
+      matchesQuery={matchesQuery}
+      anyMatch={anyMatch}
+      tbodyRef={tbodyRef}
+      orbRef={orbRef}
+      nextProfile={nextProfile}
+      runThemeSwitch={runThemeSwitch}
+      nudgeTime={nudgeTime}
+    />
+  );
 }
