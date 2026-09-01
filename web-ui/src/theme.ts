@@ -102,9 +102,10 @@ function applyProfile(): void {
   document.documentElement.style.colorScheme = p.dark ? "dark" : "light";
 }
 
-/** User-specified switch cycle: white -> rail blue -> white -> black ->
- *  white -> (blue again). White appears three times, so "next" is a
- *  position in THIS sequence, not a lookup by id. */
+/** User-specified switch cycle: white -> rail blue -> white -> black -> white.
+ *  White appears three times, but the orb must never preview the same
+ *  surface it's already showing (white-on-white bug). We cycle by id,
+ *  not by position, and skip same-id repeats. */
 const CYCLE = ["heart", "station", "heart", "heart-dark", "heart"];
 let cycleIdx = 0;
 
@@ -119,14 +120,27 @@ function syncCycle(id: string): void {
   cycleIdx = i >= 0 ? i : 0;
 }
 
-/** The theme the orb previews (and the next click lands on). */
+/** The theme the orb previews (and the next click lands on) — never the same as current. */
 export function peekNextInCycle(): Profile {
-  const next = CYCLE[(cycleIdx + 1) % CYCLE.length];
-  return profileOfId(next);
+  const cur = CYCLE[cycleIdx];
+  // walk forward until we find a different id (covers the white→white wrap)
+  for (let step = 1; step <= CYCLE.length; step++) {
+    const nxt = CYCLE[(cycleIdx + step) % CYCLE.length];
+    if (nxt !== cur) return profileOfId(nxt);
+  }
+  return profileOfId(CYCLE[(cycleIdx + 1) % CYCLE.length]);
 }
 
-/** Advance the cycle and return the theme to switch to. */
+/** Advance the cycle and return the theme to switch to — skips same-id self-loop. */
 export function advanceCycle(): Profile {
+  const cur = CYCLE[cycleIdx];
+  for (let step = 1; step <= CYCLE.length; step++) {
+    const nxtIdx = (cycleIdx + step) % CYCLE.length;
+    if (CYCLE[nxtIdx] !== cur) {
+      cycleIdx = nxtIdx;
+      return profileOfId(CYCLE[cycleIdx]);
+    }
+  }
   cycleIdx = (cycleIdx + 1) % CYCLE.length;
   return profileOfId(CYCLE[cycleIdx]);
 }

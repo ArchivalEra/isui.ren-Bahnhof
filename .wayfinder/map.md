@@ -58,7 +58,7 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
   `--md-sys-color-*` vars; iridescence via CSS gradients (`in oklch longer
   hue`) + blend/masks + `@property`, a11y-guarded; station realism = near-
   neutral surfaces + amber signal accents, aurora in seams. Full report:
-  `.wayfinder/research/web-material-you-dynamic-color.md`.
+  `docs/archive/research-web-material-you-dynamic-color.md` (archived; superseded by station-operations language).
 - [2026-08-15 - visual language REVISED] User rejected Material You anchoring
   ("no connection to realism"); research on real German station ops closed
   (station-operations-visual-language.md): realism = dark rail-blue LCD board
@@ -97,15 +97,13 @@ to `/heart`; all navigation happens inside Bahnhof from then on.
 
 | ticket | type | status | blocked-by |
 |--------|------|--------|------------|
-| edgeone-subpath-binding | research | closed | - |
-| openlist-to-object-storage | research | closed | - |
-| web-material-you-dynamic-color | research | closed | - |
 | song-wall-data-model | grilling | open (draft) | - |
 | processing-pipeline | grilling | open | - |
-| site-structure-navigation | grilling | closed | - |
-| bahnhof-visual-direction | prototype | closed | site-structure-navigation |
-| bahnhof-winner-selection | task | closed | bahnhof-visual-direction |
 | heart-bahnhof-card | task | open | Bahnhof v1 output |
+| board-build-hook-blacklist | task | open | - |
+| board-centered-window-layout | task | open | - |
+
+Archived (2026-09-01, moved to `docs/archive/`): edgeone-subpath-binding, openlist-to-object-storage, web-material-you-dynamic-color, site-structure-navigation, bahnhof-visual-direction, bahnhof-winner-selection, heart-cleanup-* (3), plus maps `map-board-auto-destinations`, `map-heart-cleanup`, `map-wave-engine-wasm` and `HANDOFF-v6`.
 
 ## Not yet specified
 

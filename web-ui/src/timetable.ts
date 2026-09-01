@@ -2,22 +2,67 @@
 // real clock, governed by schedule DISCIPLINE rather than a fixed size:
 //
 //   - same-destination departures are spaced 15..40 minutes apart
-//   - a destination holds at most two rows on the board at once
+//   - a destination holds at most ONE row on the board (unique NACH)
 //   - the board grows and shrinks naturally as destinations come and go
 //
 // Destinations themselves are discovered at build time
 // (destinations.generated.ts); train numbers stay fictional forever.
+// Feed items (posts.json) are injected at runtime and polled for changes.
 // All randomness is deterministic per slot, so the same train is always
 // the same train.
 
-import { DESTINATIONS, FEED_ITEMS } from "./destinations.generated";
+import { DESTINATIONS, FEED_ITEMS as INITIAL_FEEDS } from "./destinations.generated";
 
 export const MAX_ROWS = 12; // absolute ceiling across all destinations
 export const LINGER_MS = 3000; // how long a due row holds before leaving
 const MIN_GAP_MS = 15 * 60_000; // schedule discipline floor...
 const MAX_GAP_MS = 40 * 60_000; // ...and ceiling between same-dest trains
-const ON_BOARD_PER_DEST = 2; // discipline: max simultaneous rows per dest
+export const ON_BOARD_PER_DEST = 1; // discipline: max simultaneous rows per dest (unique NACH)
 const FIRST_LEAD_MIN = 13; // first train of a fresh timeline: 2..15 min out
+export const REFRESH_HORIZON_MS = 60 * 60_000; // 1h: future beyond this is regenerated on feed change
+
+export interface FeedItem {
+  title: string;
+  url: string;
+  desc: string | null;
+  slug: string;
+}
+
+// runtime-mutable feed store (build-time INITIAL_FEEDS is the fallback)
+let _feeds: FeedItem[] = INITIAL_FEEDS as FeedItem[];
+const _feedMap = new Map<number, FeedItem>();
+
+function hashStr(s: string): number {
+  return Math.abs(s.split("").reduce((h: number, c: string) => (h * 31 + c.charCodeAt(0)) | 0, 0));
+}
+
+function feedDestIdxFor(url: string): number {
+  // stable per-URL, far from DESTINATIONS indices (0..n)
+  return FEED_OFFSET + (hashStr(url) % 100_000);
+}
+
+function rebuildFeedMap(): void {
+  _feedMap.clear();
+  for (const fi of _feeds) {
+    const di = feedDestIdxFor(fi.url);
+    // first wins on collision (extremely rare); keeps destIdx stable
+    if (!_feedMap.has(di)) _feedMap.set(di, fi);
+  }
+}
+rebuildFeedMap();
+
+export function getFeedItems(): FeedItem[] {
+  return _feeds;
+}
+
+export function setFeedItems(items: FeedItem[]): void {
+  _feeds = items;
+  rebuildFeedMap();
+}
+
+function feedItemForDestIdx(destIdx: number): FeedItem | undefined {
+  return _feedMap.get(destIdx);
+}
 
 const REMARKS = [
   "Wagenreihung",
@@ -103,9 +148,26 @@ function materialize(sp: Spawn): Departure {
   const hhmm = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
 
   if (isFeed) {
-    const fi = FEED_ITEMS[sp.destIdx - FEED_OFFSET];
+    const fi = feedItemForDestIdx(sp.destIdx);
+    if (!fi) {
+      // stale feed destIdx after a posts.json change — fallback to a placeholder
+      return {
+        id: `feed-${sp.destIdx}-${sp.slot}`,
+        destIdx: sp.destIdx,
+        time: hhmm,
+        departsAtMs: sp.departsAtMs,
+        train: FEED_TRAINS[(sp.destIdx + sp.slot) % FEED_TRAINS.length],
+        dest: "UNKNOWN",
+        destHref: "#",
+        platform: String(1 + Math.floor(rand(sp.slot * 5.13 + sp.destIdx) * 3)),
+        state: "ontime",
+        remark: undefined,
+        cancelAtMs: undefined,
+        removalAt: undefined,
+      };
+    }
     return {
-      id: `${fi.slug}-feed-${sp.slot}`,
+      id: `${fi.slug}-feed-${sp.destIdx}-${sp.slot}`,
       destIdx: sp.destIdx,
       time: hhmm,
       departsAtMs: sp.departsAtMs,
@@ -180,13 +242,14 @@ function nextSpawnAfter(
   return { destIdx, slot, departsAtMs: memEntry.ms + gapMs(destIdx, slot) };
 }
 
-/** Initial board: every discovered destination gets up to two trains,
- *  honoring the gap discipline. Also seeds the scheduler memory.
+/** Initial board: every discovered destination gets up to ONE train
+ *  (unique NACH), honoring the gap discipline. Also seeds the scheduler memory.
  *  Feed items are each scheduled once at a deterministic time. */
 export function initialBoard(now: Date): { rows: Departure[]; mem: ScheduleMem } {
   anchorMs = now.getTime();
   const mem: ScheduleMem = {};
   const rows: Departure[] = [];
+  const feeds = getFeedItems();
 
   for (let di = 0; di < Math.max(1, DESTINATIONS.length); di++) {
     let spawn = nextSpawnAfter(undefined, di);
@@ -198,14 +261,13 @@ export function initialBoard(now: Date): { rows: Departure[]; mem: ScheduleMem }
   }
 
   // schedule feed items: each gets a deterministic departure based on
-  // its URL hash, spread across 5 hours from now
-  for (let fi = 0; fi < FEED_ITEMS.length; fi++) {
-    const di = FEED_OFFSET + fi;
-    // deterministic offset from now: hash of the URL
-    const urlHash = Math.abs(
-      FEED_ITEMS[fi].url.split("").reduce((h: number, c: string) => (h * 31 + c.charCodeAt(0)) | 0, 0),
-    );
+  // its URL hash, spread across 5 hours from now (stable per URL)
+  for (const fi of feeds) {
+    const di = feedDestIdxFor(fi.url);
+    const urlHash = hashStr(fi.url);
     const ms = anchorMs + 120_000 + (urlHash % (18_000_000 - 120_000));
+    // if two feed items collide on destIdx, first wins (rebuildFeedMap)
+    if (mem[di] || !_feedMap.has(di)) continue;
     mem[di] = { slot: 1, ms };
     const spawn: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
     rows.push(materialize(spawn));
@@ -275,9 +337,9 @@ export function tickBoard(
     rows.push(row);
   }
 
-  // refill: every destination under its two-row quota gets its next
+  // refill: every destination under its one-row quota gets its next
   // train; whichever destination is next-in-time across the network
-  // fills the tail first
+  // fills the tail first (unique NACH)
   let guard = 0;
   while (rows.length < MAX_ROWS && guard++ < 50) {
     const counts = new Map<number, number>();
@@ -291,15 +353,14 @@ export function tickBoard(
       if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
     }
     // feed items are single-shot: each departs exactly once, scheduled
-    // deterministically from its URL hash. Only schedule items not yet
-    // in the memory (i.e. not yet scheduled this session).
-    for (let fi = 0; fi < FEED_ITEMS.length; fi++) {
-      const di = FEED_OFFSET + fi;
+    // deterministically from its URL hash (stable per URL). Only schedule
+    // items not yet in the memory (i.e. not yet scheduled this session).
+    for (const fi of getFeedItems()) {
+      const di = feedDestIdxFor(fi.url);
+      if (!_feedMap.has(di)) continue; // collision loser
       if (mem[di]) continue; // already scheduled
       if ((counts.get(di) ?? 0) > 0) continue; // already on the board
-      const urlHash = Math.abs(
-        FEED_ITEMS[fi].url.split("").reduce((h: number, c: string) => (h * 31 + c.charCodeAt(0)) | 0, 0),
-      );
+      const urlHash = hashStr(fi.url);
       const ms = anchorMs + 120_000 + (urlHash % (18_000_000 - 120_000));
       const sp: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
       if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
@@ -311,4 +372,111 @@ export function tickBoard(
   }
 
   return changed ? { rows, mem, changed } : { rows: prev, mem: memIn, changed };
+}
+
+/** Force a full rebuild from the current clock and current feed set. */
+export function forceRegenerate(now: Date): { rows: Departure[]; mem: ScheduleMem } {
+  return initialBoard(now);
+}
+
+/**
+ * Refresh only the part of the board beyond `horizonMs` (default 1h).
+ * Rows within the horizon are kept verbatim; rows beyond are dropped and
+ * the tail is refilled from the current feed set and the schedule discipline.
+ * This is what the posts.json watcher calls so imminent departures never jump.
+ */
+export function refreshFuture(
+  prev: Departure[],
+  now: Date,
+  memIn: ScheduleMem,
+  horizonMs: number = REFRESH_HORIZON_MS,
+): TickResult {
+  const t = now.getTime();
+  anchorMs = t;
+  const horizon = t + horizonMs;
+
+  // keep imminent rows (including lingering DEPARTED/CANCELLED that still have a removalAt)
+  const kept: Departure[] = prev.filter((r) => r.departsAtMs <= horizon);
+  // if the board is entirely within the horizon, a refresh would be a no-op
+  // — still run the refill so newly arrived feed items can fill the tail
+  const dropped = prev.length - kept.length;
+
+  // rebuild mem: keep entries for dests that still have a kept row,
+  // and for dests whose last departure is still beyond horizon (so the
+  // next spawn stays beyond horizon rather than jumping to 2..15min).
+  // For feed items: drop mem for URLs that no longer exist in the feed set.
+  const mem: ScheduleMem = { ...memIn };
+  const keptIdx = new Set(kept.map((r) => r.destIdx));
+  const droppedIdx = new Set(prev.filter((r) => r.departsAtMs > horizon).map((r) => r.destIdx));
+  const liveFeedIdx = new Set(getFeedItems().map((fi) => feedDestIdxFor(fi.url)));
+
+  for (const k of Object.keys(mem)) {
+    const di = Number(k);
+    const isFeed = di >= FEED_OFFSET;
+    if (isFeed && !liveFeedIdx.has(di)) {
+      delete mem[di];
+      continue;
+    }
+    if (isFeed && droppedIdx.has(di)) {
+      // feed beyond horizon was dropped — allow it to be rescheduled
+      // (single-shot feeds need a new deterministic slot after the refresh)
+      delete mem[di];
+      continue;
+    }
+    // destination rows beyond horizon were dropped — keep their mem so the
+    // next departure stays disciplined (15..40min after the dropped one),
+    // i.e. still beyond the horizon, not snapping forward.
+    void keptIdx;
+  }
+
+  // if nothing was dropped and no new feed arrived, still allow new feed
+  // items (not yet in mem) to be scheduled by the refill loop
+  const baseRows = kept.slice();
+  // sort kept by time (they already are, but ensure)
+  baseRows.sort((a, b) => a.departsAtMs - b.departsAtMs);
+
+  // reuse tickBoard's refill logic starting from the kept rows
+  // (we duplicate the loop to avoid re-running the per-second culling)
+  let rows = baseRows;
+  let changed = dropped > 0;
+  let guard = 0;
+  while (rows.length < MAX_ROWS && guard++ < 50) {
+    const counts = new Map<number, number>();
+    for (const r of rows) counts.set(r.destIdx, (counts.get(r.destIdx) ?? 0) + 1);
+    let chosen: { di: number; spawn: Spawn } | null = null;
+    for (let di = 0; di < Math.max(1, DESTINATIONS.length); di++) {
+      if ((counts.get(di) ?? 0) >= ON_BOARD_PER_DEST) continue;
+      const sp = nextSpawnAfter(mem[di], di);
+      // don't schedule a destination whose next spawn is still beyond
+      // horizon+5h without bound — but we must still fill the board,
+      // so allow it; the horizon only protected the kept rows.
+      if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
+    }
+    for (const fi of getFeedItems()) {
+      const di = feedDestIdxFor(fi.url);
+      if (!_feedMap.has(di)) continue;
+      if (mem[di]) continue;
+      if ((counts.get(di) ?? 0) > 0) continue;
+      const urlHash = hashStr(fi.url);
+      const ms = anchorMs + 120_000 + (urlHash % (18_000_000 - 120_000));
+      const sp: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
+      if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
+    }
+    if (!chosen) break;
+    // ensure we don't duplicate a dest that is already on the kept board
+    rows = [...rows, materialize(chosen.spawn)];
+    rows.sort((a, b) => a.departsAtMs - b.departsAtMs);
+    mem[chosen.di] = { slot: chosen.spawn.slot, ms: chosen.spawn.departsAtMs };
+    changed = true;
+  }
+
+  // if we dropped something, we definitely changed; otherwise only if we added
+  if (!changed) {
+    // also consider feed set shrinkage (removed posts) as a change
+    const prevFeedIds = new Set(prev.filter((r) => r.destIdx >= FEED_OFFSET).map((r) => r.destIdx));
+    const nowFeedIds = new Set(liveFeedIdx);
+    for (const id of prevFeedIds) if (!nowFeedIds.has(id)) { changed = true; break; }
+  }
+
+  return changed ? { rows, mem, changed } : { rows: prev, mem: memIn, changed: false };
 }

@@ -7,15 +7,30 @@
 // full-page scenes are mounted - old theme base, target colors riding the
 // wobbled rim (SVG displacement), target colors revealed inside the
 // growing circle from the orb. Everything crosses the arc together.
-import { useEffect, useRef, useState, useLayoutEffect } from "preact/hooks";
+import { useEffect, useRef, useState, useLayoutEffect, useMemo } from "preact/hooks";
 import { signal } from "@preact/signals";
+import { memo } from "preact/compat";
 import { currentProfile, setProfile, peekNextInCycle, advanceCycle, type Profile } from "./theme";
-import { initialBoard, tickBoard, type Departure, type ScheduleMem } from "./timetable";
+import {
+  initialBoard,
+  tickBoard,
+  refreshFuture,
+  forceRegenerate,
+  getFeedItems,
+  setFeedItems,
+  type Departure,
+  type ScheduleMem,
+} from "./timetable";
 import { DESTINATIONS } from "./destinations.generated";
 import { waveEngineStart } from "./wave-engine";
+import { startFeedWatcher } from "./feed-watcher";
 import type { ComponentChildren, RefObject } from "preact";
 
-const paused = signal(false);
+/** Time-travel offset for the station clock (replaces the old pause toggle).
+ *  In-memory only — a hard refresh (window.location.reload) naturally resets
+ *  it to 0 (real time). The base ?clock param from the URL remains. */
+const timeOffset = signal(0);
+const TIME_STEP_MS = 15 * 60_000; // 15 min per click — matches MIN_GAP_MS
 
 /** Module-level on purpose: an in-body component identity would be
  *  remounted by every per-second Board tick, which used to replay the
@@ -44,6 +59,90 @@ function ThemeOrb({
   );
 }
 
+// Hall decor is static — no props, no state. Defined once so per-second
+// Board ticks don't recreate 5 large SVGs (≈150 DOM nodes) every second.
+function HallDecor() {
+  return (
+    <div class="hall">
+      {/* floor */}
+      <div class="decor-floor" />
+      {/* waiting bench */}
+      <svg class="decor decor-bench" viewBox="0 0 220 110" width="220" height="110">
+        <rect x="18" y="8" width="184" height="7" rx="3" fill="var(--on-surface-variant)" opacity=".55" />
+        <rect x="26" y="4" width="8" height="52" rx="3" fill="var(--outline)" />
+        <rect x="186" y="4" width="8" height="52" rx="3" fill="var(--outline)" />
+        <rect x="10" y="52" width="200" height="12" rx="5" fill="var(--surface-container)" />
+        <rect x="30" y="64" width="9" height="42" rx="3" fill="var(--outline)" />
+        <rect x="181" y="64" width="9" height="42" rx="3" fill="var(--outline)" />
+        <rect x="24" y="98" width="21" height="5" rx="2" fill="var(--outline)" opacity=".6" />
+        <rect x="175" y="98" width="21" height="5" rx="2" fill="var(--outline)" opacity=".6" />
+      </svg>
+      {/* tall plant right */}
+      <svg class="decor decor-plant-r" viewBox="0 0 120 170" width="120" height="170">
+        <ellipse cx="60" cy="34" rx="14" ry="30" fill="var(--signal-ok)" transform="rotate(-18 60 34)" />
+        <ellipse cx="44" cy="46" rx="11" ry="26" fill="var(--signal-ok)" transform="rotate(-38 44 46)" opacity=".85" />
+        <ellipse cx="78" cy="44" rx="11" ry="27" fill="var(--signal-ok)" transform="rotate(16 78 44)" opacity=".9" />
+        <ellipse cx="60" cy="28" rx="9" ry="26" fill="var(--signal-ok)" opacity=".75" />
+        <path d="M60 58 C58 84 56 96 50 112 L70 112 C64 96 62 84 60 58 Z" fill="var(--signal-ok)" opacity=".55" />
+        <path d="M40 112 H80 L74 158 Q60 164 46 158 Z" fill="var(--signal-warn)" />
+        <rect x="37" y="108" width="46" height="9" rx="3" fill="var(--signal-warn)" />
+      </svg>
+      {/* small plant left */}
+      <svg class="decor decor-plant-l" viewBox="0 0 90 120" width="90" height="120">
+        <ellipse cx="45" cy="34" rx="11" ry="24" fill="var(--signal-ok)" transform="rotate(-14 45 34)" />
+        <ellipse cx="32" cy="46" rx="9" ry="20" fill="var(--signal-ok)" transform="rotate(-36 32 46)" opacity=".85" />
+        <ellipse cx="59" cy="44" rx="9" ry="21" fill="var(--signal-ok)" transform="rotate(15 59 44)" opacity=".9" />
+        <path d="M45 60 C43 76 42 84 38 94 L52 94 C48 84 47 76 45 60 Z" fill="var(--signal-ok)" opacity=".55" />
+        <path d="M31 94 H59 L54 116 Q45 121 36 116 Z" fill="var(--signal-warn)" />
+        <rect x="29" y="91" width="32" height="7" rx="3" fill="var(--signal-warn)" />
+      </svg>
+      {/* drinks vending machine */}
+      <svg class="decor decor-vending" viewBox="0 0 96 170" width="96" height="170">
+        <rect x="6" y="6" width="84" height="158" rx="4" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="2" />
+        <rect x="14" y="16" width="52" height="98" rx="2" fill="var(--surface-dim)" stroke="var(--outline)" />
+        {[0, 1, 2, 3].map((row) => (
+          <g key={row}>
+            <line x1="16" y1={40 + row * 25} x2="64" y2={40 + row * 25} stroke="var(--outline)" stroke-width="1.5" />
+            <rect x={20 + row * 11} y={22 + row * 25} width="7" height="15" rx="2" fill={row % 2 ? "var(--signal-delay)" : "var(--signal-ok)"} opacity=".8" />
+            <rect x={44 - row * 6} y={22 + row * 25} width="7" height="15" rx="2" fill="var(--signal-warn)" opacity=".65" />
+          </g>
+        ))}
+        <rect x="72" y="20" width="12" height="60" rx="2" fill="var(--surface)" stroke="var(--outline)" stroke-width="1.5" />
+        <circle cx="78" cy="30" r="3" fill="var(--signal-ok)" />
+        <rect x="74" y="40" width="8" height="26" rx="1" fill="var(--outline)" opacity=".5" />
+        <rect x="14" y="122" width="52" height="30" rx="2" fill="var(--surface)" stroke="var(--outline)" stroke-width="1.5" />
+        <text x="40" y="142" text-anchor="middle" font-size="9" letter-spacing="2" fill="var(--on-surface-variant)">PULL</text>
+        <rect x="6" y="164" width="84" height="4" rx="2" fill="var(--outline)" opacity=".6" />
+      </svg>
+      {/* baggage security scanner */}
+      <svg class="decor decor-security" viewBox="0 0 210 110" width="210" height="110">
+        <rect x="10" y="86" width="190" height="8" rx="3" fill="var(--outline)" opacity=".55" />
+        {[24, 58, 92, 126, 160, 188].map((x) => (
+          <circle key={x} cx={x} cy="90" r="5" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="1.5" />
+        ))}
+        <path d="M70 22 H140 L152 66 H58 Z" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="2" />
+        <rect x="62" y="18" width="86" height="10" rx="3" fill="var(--outline)" opacity=".7" />
+        <rect x="74" y="30" width="62" height="28" rx="2" fill="var(--surface-dim)" stroke="var(--outline)" />
+        <rect x="80" y="36" width="50" height="16" rx="1" fill="var(--signal-warn)" opacity=".35" />
+        {[68, 144].map((x) => (
+          <rect key={x} x={x} y="26" width="8" height="44" rx="2" fill="var(--outline)" opacity=".75" />
+        ))}
+        <rect x="156" y="34" width="44" height="42" rx="3" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="2" />
+        <rect x="162" y="40" width="26" height="18" rx="2" fill="var(--surface-dim)" stroke="var(--outline)" />
+        <circle cx="186" cy="49" r="4" fill="var(--signal-ok)" />
+        {[162, 172, 182].map((x, i) => (
+          <circle key={x} cx={x + 4} cy="66" r="3" fill={["var(--signal-ok)", "var(--signal-warn)", "var(--signal-delay)"][i]} />
+        ))}
+        <rect x="176" y="60" width="18" height="12" rx="2" fill="var(--outline)" opacity=".4" />
+        <rect x="10" y="30" width="44" height="26" rx="3" fill="var(--surface-dim)" stroke="var(--outline)" stroke-width="1.5" opacity=".85" />
+        <path d="M20 48 l10 -12 l8 6 l9 -10" fill="none" stroke="var(--on-surface-variant)" stroke-width="2" opacity=".6" />
+      </svg>
+    </div>
+  );
+}
+const HallDecorMemo = memo(HallDecor);
+const ThemeOrbMemo = memo(ThemeOrb);
+
 // ?wavespeed=ms overrides sweep duration - demo/test hook
 const speedParam =
   typeof window !== "undefined"
@@ -71,7 +170,7 @@ const CLOCK_OFFSET = (() => {
   return Number.isFinite(secs) && secs !== 0 ? secs * 1000 : 0;
 })();
 function stationNow(): Date {
-  return new Date(Date.now() + CLOCK_OFFSET);
+  return new Date(Date.now() + CLOCK_OFFSET + timeOffset.value);
 }
 
 /** Isolated live clock: re-renders itself every second, nothing else. */
@@ -152,6 +251,70 @@ export default function Board() {
       });
     }, 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // runtime posts.json watcher: polls each destination's posts.json,
+  // and on change force-refreshes the part of the board beyond 1h
+  useEffect(() => {
+    const stop = startFeedWatcher(getFeedItems, (next) => {
+      setFeedItems(next);
+      const t = stationNow();
+      setBoard((prev) => {
+        const r = refreshFuture(prev, t, memRef.current);
+        memRef.current = r.mem;
+        return r.rows;
+      });
+    });
+    return stop;
+  }, []);
+
+  // manual trigger (dev-only, no visible button): URL param (?regen / ?regenerate / ?force) + window event
+  function triggerRegenerate(full: boolean) {
+    const t = stationNow();
+    if (full) {
+      const r = forceRegenerate(t);
+      memRef.current = r.mem;
+      setBoard(r.rows);
+      setNow(t);
+    } else {
+      setBoard((prev) => {
+        const r = refreshFuture(prev, t, memRef.current);
+        memRef.current = r.mem;
+        return r.rows;
+      });
+      setNow(t);
+    }
+  }
+
+  function nudgeTime(deltaMs: number) {
+    timeOffset.value += deltaMs;
+    const t = stationNow();
+    // time travel invalidates the old schedule — rebuild from the new now
+    const r = forceRegenerate(t);
+    memRef.current = r.mem;
+    setBoard(r.rows);
+    setNow(t);
+  }
+
+  // URL param trigger (checked once on mount)
+  useEffect(() => {
+    const qs = new URLSearchParams(window.location.search);
+    if (qs.has("regen") || qs.has("regenerate") || qs.has("force")) {
+      // defer one tick so the initial board has mounted
+      const id = setTimeout(() => triggerRegenerate(true), 300);
+      return () => clearTimeout(id);
+    }
+  }, []);
+
+  // external trigger via event (for tests / console):
+  //   dispatchEvent(new CustomEvent("bahnhof:regenerate", { detail: { full: true } }))
+  useEffect(() => {
+    const onRegen = (e: Event) => {
+      const detail = (e as CustomEvent).detail as { full?: boolean } | undefined;
+      triggerRegenerate(detail?.full ?? true);
+    };
+    window.addEventListener("bahnhof:regenerate" as never, onRegen as EventListener);
+    return () => window.removeEventListener("bahnhof:regenerate" as never, onRegen as EventListener);
   }, []);
 
   // keyboard avoidance (universal VisualViewport path): the distance from
@@ -352,85 +515,16 @@ export default function Board() {
   const anyMatch = !q || board.some(matchesQuery);
   const cur = currentProfile();
 
+  // perf: hall is static via memo, table is the only per-second diff
+  const nextProfile = useMemo(() => peekNextInCycle(), [cur.id]);
+  const profileVars = useMemo(() => varsOf(cur), [cur.id]);
+
   /** One complete page: hall + furniture + board. */
-  function Scene({ profile }: { profile: Profile }) {
+  function Scene({ profile, vars }: { profile: Profile; vars?: Record<string, string> }) {
+    const v = vars ?? varsOf(profile);
     return (
-      <div class="scene-body" style={varsOf(profile)}>
-        <div class="hall">
-          {/* floor */}
-          <div class="decor-floor" />
-          {/* waiting bench */}
-          <svg class="decor decor-bench" viewBox="0 0 220 110" width="220" height="110">
-            <rect x="18" y="8" width="184" height="7" rx="3" fill="var(--on-surface-variant)" opacity=".55" />
-            <rect x="26" y="4" width="8" height="52" rx="3" fill="var(--outline)" />
-            <rect x="186" y="4" width="8" height="52" rx="3" fill="var(--outline)" />
-            <rect x="10" y="52" width="200" height="12" rx="5" fill="var(--surface-container)" />
-            <rect x="30" y="64" width="9" height="42" rx="3" fill="var(--outline)" />
-            <rect x="181" y="64" width="9" height="42" rx="3" fill="var(--outline)" />
-            <rect x="24" y="98" width="21" height="5" rx="2" fill="var(--outline)" opacity=".6" />
-            <rect x="175" y="98" width="21" height="5" rx="2" fill="var(--outline)" opacity=".6" />
-          </svg>
-          {/* tall plant right */}
-          <svg class="decor decor-plant-r" viewBox="0 0 120 170" width="120" height="170">
-            <ellipse cx="60" cy="34" rx="14" ry="30" fill="var(--signal-ok)" transform="rotate(-18 60 34)" />
-            <ellipse cx="44" cy="46" rx="11" ry="26" fill="var(--signal-ok)" transform="rotate(-38 44 46)" opacity=".85" />
-            <ellipse cx="78" cy="44" rx="11" ry="27" fill="var(--signal-ok)" transform="rotate(16 78 44)" opacity=".9" />
-            <ellipse cx="60" cy="28" rx="9" ry="26" fill="var(--signal-ok)" opacity=".75" />
-            <path d="M60 58 C58 84 56 96 50 112 L70 112 C64 96 62 84 60 58 Z" fill="var(--signal-ok)" opacity=".55" />
-            <path d="M40 112 H80 L74 158 Q60 164 46 158 Z" fill="var(--signal-warn)" />
-            <rect x="37" y="108" width="46" height="9" rx="3" fill="var(--signal-warn)" />
-          </svg>
-          {/* small plant left */}
-          <svg class="decor decor-plant-l" viewBox="0 0 90 120" width="90" height="120">
-            <ellipse cx="45" cy="34" rx="11" ry="24" fill="var(--signal-ok)" transform="rotate(-14 45 34)" />
-            <ellipse cx="32" cy="46" rx="9" ry="20" fill="var(--signal-ok)" transform="rotate(-36 32 46)" opacity=".85" />
-            <ellipse cx="59" cy="44" rx="9" ry="21" fill="var(--signal-ok)" transform="rotate(15 59 44)" opacity=".9" />
-            <path d="M45 60 C43 76 42 84 38 94 L52 94 C48 84 47 76 45 60 Z" fill="var(--signal-ok)" opacity=".55" />
-            <path d="M31 94 H59 L54 116 Q45 121 36 116 Z" fill="var(--signal-warn)" />
-            <rect x="29" y="91" width="32" height="7" rx="3" fill="var(--signal-warn)" />
-          </svg>
-          {/* drinks vending machine */}
-          <svg class="decor decor-vending" viewBox="0 0 96 170" width="96" height="170">
-            <rect x="6" y="6" width="84" height="158" rx="4" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="2" />
-            <rect x="14" y="16" width="52" height="98" rx="2" fill="var(--surface-dim)" stroke="var(--outline)" />
-            {[0, 1, 2, 3].map((row) => (
-              <g key={row}>
-                <line x1="16" y1={40 + row * 25} x2="64" y2={40 + row * 25} stroke="var(--outline)" stroke-width="1.5" />
-                <rect x={20 + row * 11} y={22 + row * 25} width="7" height="15" rx="2" fill={row % 2 ? "var(--signal-delay)" : "var(--signal-ok)"} opacity=".8" />
-                <rect x={44 - row * 6} y={22 + row * 25} width="7" height="15" rx="2" fill="var(--signal-warn)" opacity=".65" />
-              </g>
-            ))}
-            <rect x="72" y="20" width="12" height="60" rx="2" fill="var(--surface)" stroke="var(--outline)" stroke-width="1.5" />
-            <circle cx="78" cy="30" r="3" fill="var(--signal-ok)" />
-            <rect x="74" y="40" width="8" height="26" rx="1" fill="var(--outline)" opacity=".5" />
-            <rect x="14" y="122" width="52" height="30" rx="2" fill="var(--surface)" stroke="var(--outline)" stroke-width="1.5" />
-            <text x="40" y="142" text-anchor="middle" font-size="9" letter-spacing="2" fill="var(--on-surface-variant)">PULL</text>
-            <rect x="6" y="164" width="84" height="4" rx="2" fill="var(--outline)" opacity=".6" />
-          </svg>
-          {/* baggage security scanner */}
-          <svg class="decor decor-security" viewBox="0 0 210 110" width="210" height="110">
-            <rect x="10" y="86" width="190" height="8" rx="3" fill="var(--outline)" opacity=".55" />
-            {[24, 58, 92, 126, 160, 188].map((x) => (
-              <circle key={x} cx={x} cy="90" r="5" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="1.5" />
-            ))}
-            <path d="M70 22 H140 L152 66 H58 Z" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="2" />
-            <rect x="62" y="18" width="86" height="10" rx="3" fill="var(--outline)" opacity=".7" />
-            <rect x="74" y="30" width="62" height="28" rx="2" fill="var(--surface-dim)" stroke="var(--outline)" />
-            <rect x="80" y="36" width="50" height="16" rx="1" fill="var(--signal-warn)" opacity=".35" />
-            {[68, 144].map((x) => (
-              <rect key={x} x={x} y="26" width="8" height="44" rx="2" fill="var(--outline)" opacity=".75" />
-            ))}
-            <rect x="156" y="34" width="44" height="42" rx="3" fill="var(--surface-container)" stroke="var(--outline)" stroke-width="2" />
-            <rect x="162" y="40" width="26" height="18" rx="2" fill="var(--surface-dim)" stroke="var(--outline)" />
-            <circle cx="186" cy="49" r="4" fill="var(--signal-ok)" />
-            {[162, 172, 182].map((x, i) => (
-              <circle key={x} cx={x + 4} cy="66" r="3" fill={["var(--signal-ok)", "var(--signal-warn)", "var(--signal-delay)"][i]} />
-            ))}
-            <rect x="176" y="60" width="18" height="12" rx="2" fill="var(--outline)" opacity=".4" />
-            <rect x="10" y="30" width="44" height="26" rx="3" fill="var(--surface-dim)" stroke="var(--outline)" stroke-width="1.5" opacity=".85" />
-            <path d="M20 48 l10 -12 l8 6 l9 -10" fill="none" stroke="var(--on-surface-variant)" stroke-width="2" opacity=".6" />
-          </svg>
-        </div>
+      <div class="scene-body" style={v}>
+        <HallDecorMemo />
         {/* elastic stage: the board centers here and absorbs all growth
             internally - the search slot below never moves */}
         <div class="stage">
@@ -438,16 +532,25 @@ export default function Board() {
             <header class="head">
               <h1>ISUI.REN — HAUPTBAHNHOF</h1>
             <div class="controls">
-              <ThemeOrb next={peekNextInCycle()} onSwitch={runThemeSwitch} orbRef={orbRef} />
+              <ThemeOrbMemo next={nextProfile} onSwitch={runThemeSwitch} orbRef={orbRef} />
               <Clock />
               <button
                 type="button"
-                class="toggle"
-                aria-pressed={paused.value}
-                aria-label={paused.value ? "Resume scrolling" : "Pause scrolling"}
-                onClick={() => (paused.value = !paused.value)}
+                class="time-nudge"
+                aria-label="Rewind 15 minutes"
+                title="Rewind 15 minutes"
+                onClick={() => nudgeTime(-TIME_STEP_MS)}
               >
-                {paused.value ? "▶" : "⏸"}
+                −15
+              </button>
+              <button
+                type="button"
+                class="time-nudge"
+                aria-label="Fast-forward 15 minutes"
+                title="Fast-forward 15 minutes (hard refresh resets to real time)"
+                onClick={() => nudgeTime(TIME_STEP_MS)}
+              >
+                +15
               </button>
             </div>
           </header>
@@ -556,5 +659,5 @@ export default function Board() {
     );
   }
 
-  return <Scene profile={cur} />;
+  return <Scene profile={cur} vars={profileVars} />;
 }

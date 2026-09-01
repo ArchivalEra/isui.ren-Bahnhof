@@ -14,6 +14,14 @@ time from the shared deploy branch, filtered through a build-time-only
 blacklist, and emitted as a typed module
 (`web-ui/src/destinations.generated.ts`) that the board consumes.
 
+Feed items (blog articles etc.) are **not** baked at build time: each
+destination's `posts.json` is fetched at runtime (every 20s) and merged
+into the departure queue. When `posts.json` changes, the board
+preserves imminent departures (within 1h) and regenerates the tail
+beyond 1h (`refreshFuture`). A manual trigger is also available
+(button + `?regen`). See `web-ui/src/timetable.ts:388` and
+`web-ui/src/feed-watcher.ts:1`.
+
 Two invariants hold throughout:
 
 - The blacklist (`web-ui/board.blacklist`) is consumed only during the
@@ -82,24 +90,25 @@ Constants:
 | -------------------- | --------- | ------------------------------------------------ |
 | `MIN_GAP_MS`         | 15 min    | Floor for the gap between same-destination trains |
 | `MAX_GAP_MS`         | 40 min    | Ceiling for that gap                             |
-| `ON_BOARD_PER_DEST`  | 2         | Max simultaneous rows per destination            |
+| `ON_BOARD_PER_DEST`  | 1         | Max simultaneous rows per destination (unique NACH) |
 | `MAX_ROWS`           | 12        | Absolute ceiling across all destinations         |
 | `LINGER_MS`          | 3 s       | How long a due row holds as DEPARTED before leaving |
 | `FIRST_LEAD_MIN`     | 13        | First train of a fresh timeline lands 2..15 min out |
+| `REFRESH_HORIZON_MS` | 60 min    | Horizon for feed-triggered refresh: rows beyond this are regenerated |
 
 Behavior:
 
-- `initialBoard` seeds every discovered destination with up to two
-  trains, honoring the gap discipline, and sorts the board by
+- `initialBoard` seeds every discovered destination with one train
+  (unique NACH), honoring the gap discipline, and sorts the board by
   departure time.
 - `tickBoard` runs once per second: due trains become DEPARTED,
   linger `LINGER_MS`, then leave; live cancellations flip a train to
   CANCELLED on the spot 30-90 s before departure.
 - After removals, the refill loop appends the next train of every
-  destination still under its two-row quota, always choosing the
+  destination still under its one-row quota, always choosing the
   earliest next departure across the network, until `MAX_ROWS`.
 - Net effect: same-destination departures are always 15-40 minutes
-  apart, a destination never holds more than two rows, the board never
+  apart, a destination never holds more than one row, the board never
   exceeds 12 rows, and the row count otherwise floats naturally with
   the number of destinations.
 

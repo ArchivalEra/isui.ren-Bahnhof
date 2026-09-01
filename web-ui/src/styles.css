@@ -53,7 +53,8 @@ body {
 }
 
 .theme-picker,
-.toggle {
+.toggle,
+.time-nudge {
   background: var(--surface);
   color: var(--on-surface);
   border: 1px solid var(--outline);
@@ -62,8 +63,14 @@ body {
   font-size: 0.8rem;
 }
 .toggle { min-width: 2.2rem; }
+.time-nudge {
+  min-width: 2.6rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.06em;
+}
 .theme-picker:focus-visible,
-.toggle:focus-visible {
+.toggle:focus-visible,
+.time-nudge:focus-visible {
   outline: 2px solid var(--signal-warn);
   outline-offset: 2px;
 }
@@ -219,6 +226,10 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   cursor: pointer;
   position: relative;
   overflow: hidden;
+  /* white-on-white fallback: subtle ring + shadow keeps the orb visible even if it previews white on white */
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--on-surface) 8%, transparent),
+    0 1px 6px rgba(0, 0, 0, 0.12);
 }
 .theme-orb:focus-visible { outline: 2px solid var(--signal-warn); outline-offset: 3px; }
 /* radial theme wave: three stacked full-page scenes.
