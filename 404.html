@@ -14,6 +14,7 @@
   --variant: #4d4d4d;
   --delay: #e30613;
   --warn: #b46a00;
+  --glow: #f59e0b;
 }
 @media (prefers-color-scheme: dark) {
   :root {
@@ -22,6 +23,7 @@
     --outline: #333333;
     --ink: #f2efe7;
     --variant: #a9b2c4;
+    --glow: #fbbf24;
   }
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -42,19 +44,50 @@ body {
   justify-content: space-between;
   align-items: baseline;
   gap: 0.75rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 h1 { font-size: 1rem; font-weight: 800; letter-spacing: 0.28em; }
 .clock { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.08em; }
 .big {
-  font-size: clamp(4rem, 16vw, 7.5rem);
+  font-size: clamp(3.5rem, 14vw, 6.5rem);
   font-weight: 800;
   letter-spacing: 0.06em;
   line-height: 1;
-  padding: 1.2rem 0 0.9rem;
+  padding: 0.8rem 0 0.6rem;
   border-bottom: 2px solid var(--outline);
 }
-table { width: 100%; border-collapse: collapse; margin-top: 0.9rem; }
+
+/* ─── Canvas Railway Night Vignette ─── */
+.track-card {
+  width: 100%;
+  height: 110px;
+  border-radius: 6px;
+  overflow: hidden;
+  margin: 0.9rem 0;
+  border: 1px solid var(--outline);
+  background: #080a10;
+  position: relative;
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.25);
+}
+.track-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.track-tag {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.75rem;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: rgba(254, 240, 138, 0.7);
+  pointer-events: none;
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+table { width: 100%; border-collapse: collapse; margin-top: 0.5rem; }
 th, td {
   text-align: left;
   padding: 0.55rem 0.8rem;
@@ -71,6 +104,84 @@ th + th, td + td { border-left: 1px solid color-mix(in srgb, var(--outline) 32%,
 .status { color: var(--delay); font-weight: 700; letter-spacing: 0.08em; }
 .sub { display: block; font-size: 0.72rem; font-weight: 400; color: var(--variant); margin-top: 0.3rem; letter-spacing: 0.02em; }
 .dest { font-weight: 700; }
+
+/* ─── Astro Route Hint Panel ─── */
+.route-notice {
+  margin-top: 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--surface-dim);
+  border: 1px solid var(--outline);
+  border-left: 3px solid var(--warn);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+.notice-badge {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: var(--warn);
+  margin-bottom: 0.35rem;
+  text-transform: uppercase;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.notice-msg {
+  color: var(--ink);
+  margin-bottom: 0.45rem;
+  word-break: break-word;
+}
+.notice-msg code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.85em;
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--outline) 35%, transparent);
+}
+.notice-msg a, .routes-list a {
+  color: var(--ink);
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 1.5px solid var(--warn);
+  padding-bottom: 1px;
+}
+.notice-msg a:hover, .routes-list a:hover {
+  border-bottom-color: var(--delay);
+  color: var(--delay);
+}
+.available-routes {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px dashed color-mix(in srgb, var(--outline) 50%, transparent);
+  font-size: 0.76rem;
+  color: var(--variant);
+}
+.routes-label {
+  display: block;
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 0.3rem;
+  color: var(--variant);
+}
+.routes-list {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.2rem;
+  padding: 0;
+  margin: 0;
+}
+.routes-list li {
+  display: inline-flex;
+  align-items: center;
+}
+.routes-list li::before {
+  content: "→";
+  color: var(--warn);
+  margin-right: 0.3rem;
+  font-weight: 800;
+}
+
 .foot {
   margin-top: 1rem;
   font-size: 0.68rem;
@@ -81,6 +192,11 @@ th + th, td + td { border-left: 1px solid color-mix(in srgb, var(--outline) 32%,
   align-items: center;
   gap: 1rem;
   flex-wrap: wrap;
+}
+.foot-links {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
 }
 a {
   color: var(--ink);
@@ -102,6 +218,12 @@ a:hover { border-bottom-color: var(--delay); }
 
   <div class="big">404</div>
 
+  <!-- HTML-in-Canvas: Night track & warm glowing railway lantern animation -->
+  <div class="track-card">
+    <span class="track-tag">GLEIS SIGNAL · STRECKE BEI NACHT</span>
+    <canvas id="track-canvas" class="track-canvas"></canvas>
+  </div>
+
   <table>
     <thead>
       <tr>
@@ -115,7 +237,7 @@ a:hover { border-bottom-color: var(--delay); }
       <tr>
         <td>— — —</td>
         <td class="dest">Nirgendwo
-          <span class="sub">this platform does not exist</span>
+          <span class="sub" id="requested-path-sub">this platform does not exist</span>
         </td>
         <td class="hidewide">—</td>
         <td><span class="status">CANCELLED</span>
@@ -125,19 +247,299 @@ a:hover { border-bottom-color: var(--delay); }
     </tbody>
   </table>
 
+  <!-- Astro-style Intelligent Route Reminder -->
+  <div id="route-notice" class="route-notice">
+    <div class="notice-badge">FAHRPLAN-AUSKUNFT · ROUTE SUGGESTION</div>
+    <div class="notice-msg" id="notice-msg">
+      Checking route schedule...
+    </div>
+    <div class="available-routes">
+      <span class="routes-label">Available destinations / Verfügbare Strecken:</span>
+      <ul class="routes-list">
+        <li><a href="/MangoMesa/">/MangoMesa/ (Mango Mesa 博客)</a></li>
+        <li><a href="/Bahnhof/">/Bahnhof/ (Hauptbahnhof 站台)</a></li>
+        <li><a href="/heart/">/heart/ (Core 核心)</a></li>
+      </ul>
+    </div>
+  </div>
+
   <div class="foot">
     <span>AKTUALISIERT LIVE · SOLL/IST</span>
-    <a href="/Bahnhof/">ZURÜCK IM BAHNHOF →</a>
+    <div class="foot-links">
+      <a href="/MangoMesa/">ZUM MANGO MESA →</a>
+      <a href="/Bahnhof/">ZURÜCK IM BAHNHOF →</a>
+    </div>
   </div>
 </main>
-<script>
+
+<script is:inline>
+  // 1. Visitor's Local Clock
   const el = document.getElementById("clock");
   const tick = () => {
-    // visitor's own timezone and locale - matches their desktop clock
     el.textContent = new Date().toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   };
   tick();
   setInterval(tick, 1000);
+
+  // 2. Astro-style intelligent path hint logic
+  (function initAstroPathHint() {
+    const rawPath = window.location.pathname;
+    const search = window.location.search;
+    const hash = window.location.hash;
+    const msgEl = document.getElementById("notice-msg");
+    const requestedPathSub = document.getElementById("requested-path-sub");
+
+    if (requestedPathSub && rawPath) {
+      requestedPathSub.textContent = "requested: " + rawPath;
+    }
+
+    const knownRoutes = [
+      "about", "archive", "moments", "albums", "categories", "tags",
+      "projects", "skills", "timeline", "devices", "compass", "friends", "anime",
+      "posts", "atom.xml", "rss.xml", "llms.txt"
+    ];
+
+    let explanation = "";
+
+    // A. Visited old /Blog/ path
+    if (/^\/Blog(\/.*)?$/i.test(rawPath)) {
+      const target = rawPath.replace(/^\/Blog/i, "/MangoMesa") + search + hash;
+      explanation = `The blog has migrated to <code>/MangoMesa/</code>. Did you mean to visit <a href="${escapeHtml(target)}">${escapeHtml(target)}</a>?`;
+    }
+    // B. Visited known blog route without /MangoMesa/ prefix
+    else {
+      const cleanPath = rawPath.replace(/^\/+/, "");
+      const firstSegment = cleanPath.split("/")[0].toLowerCase();
+
+      if (knownRoutes.includes(firstSegment)) {
+        const target = "/MangoMesa/" + cleanPath + search + hash;
+        explanation = `The server is configured with routes under <code>/MangoMesa/</code>. Did you mean to visit <a href="${escapeHtml(target)}">${escapeHtml(target)}</a>?`;
+      } else if (cleanPath === "" || cleanPath === "index.html") {
+        explanation = `Looking for the station hub? Connect directly to <a href="/MangoMesa/">/MangoMesa/</a>.`;
+      } else if (firstSegment === "station" || firstSegment === "bahn") {
+        explanation = `Did you mean to visit the station at <a href="/Bahnhof/">/Bahnhof/</a>?`;
+      } else {
+        explanation = `The requested URL <code>${escapeHtml(rawPath)}</code> was not found on this platform. Did you mean to visit <a href="/MangoMesa/">/MangoMesa/</a>?`;
+      }
+    }
+
+    if (msgEl) {
+      msgEl.innerHTML = explanation;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+  })();
+
+  // 3. Night Railway Signal Lantern Canvas (KB-level, Material 3 Emphasized Motion)
+  (function initLanternCanvas() {
+    const canvas = document.getElementById("track-canvas");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let width = 0;
+    let height = 0;
+    let dpr = 1;
+
+    function resize() {
+      dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect();
+      width = rect.width;
+      height = rect.height;
+      canvas.width = Math.round(width * dpr);
+      canvas.height = Math.round(height * dpr);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+
+    window.addEventListener("resize", resize);
+    resize();
+
+    // Material 3 Emphasized easing: cubic-bezier(0.2, 0, 0, 1) approximation
+    function m3Ease(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    const startTime = performance.now();
+
+    function render(now) {
+      const elapsed = (now - startTime) / 1000;
+      ctx.clearRect(0, 0, width, height);
+
+      // Nocturnal sky / ballast gradient
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+      bgGrad.addColorStop(0, "#080a10");
+      bgGrad.addColorStop(0.65, "#0d111a");
+      bgGrad.addColorStop(1, "#141824");
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, width, height);
+
+      // Distant horizon line
+      ctx.fillStyle = "rgba(255, 255, 255, 0.025)";
+      ctx.fillRect(0, height * 0.45, width, 1);
+
+      // Railway track perspective (vanishing point)
+      const vx = width * 0.38;
+      const vy = height * 0.32;
+      const leftBase = width * 0.06;
+      const rightBase = width * 0.72;
+      const bottomY = height + 10;
+
+      // Wooden Sleepers (Ties)
+      const numTies = 10;
+      for (let i = 1; i <= numTies; i++) {
+        const progress = Math.pow(i / numTies, 1.8);
+        const tieY = vy + (bottomY - vy) * progress;
+        if (tieY < vy + 10) continue;
+
+        const tLeft = vx + (leftBase - vx) * progress;
+        const tRight = vx + (rightBase - vx) * progress;
+        const tieWidth = tRight - tLeft;
+        const tieHeight = Math.max(2, 6 * progress);
+
+        ctx.fillStyle = `rgba(32, 28, 25, ${0.4 + 0.5 * progress})`;
+        ctx.fillRect(tLeft - tieWidth * 0.08, tieY - tieHeight * 0.5, tieWidth * 1.16, tieHeight);
+      }
+
+      // Rails
+      function drawRail(startX) {
+        ctx.beginPath();
+        ctx.moveTo(vx, vy);
+        ctx.quadraticCurveTo(vx + (startX - vx) * 0.45, vy + (bottomY - vy) * 0.5, startX, bottomY);
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = "rgba(45, 55, 72, 0.7)";
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(vx, vy);
+        ctx.quadraticCurveTo(vx + (startX - vx) * 0.45, vy + (bottomY - vy) * 0.5, startX, bottomY);
+        ctx.lineWidth = 1.6;
+        ctx.strokeStyle = "rgba(148, 163, 184, 0.6)";
+        ctx.stroke();
+      }
+
+      drawRail(leftBase);
+      drawRail(rightBase);
+
+      // Lantern mast and housing
+      const lampX = Math.min(width * 0.82, width - 42);
+      const lampBaseY = height * 0.95;
+      const lampHeight = height * 0.66;
+      const lampY = lampBaseY - lampHeight;
+
+      // Base shadow
+      ctx.beginPath();
+      ctx.ellipse(lampX, lampBaseY, 14, 4, 0, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
+      ctx.fill();
+
+      // Post pole
+      ctx.beginPath();
+      ctx.moveTo(lampX - 1.5, lampBaseY);
+      ctx.lineTo(lampX - 1, lampY + 12);
+      ctx.lineTo(lampX + 1, lampY + 12);
+      ctx.lineTo(lampX + 1.5, lampBaseY);
+      ctx.fillStyle = "#1e2433";
+      ctx.fill();
+
+      // Horizontal bracket
+      ctx.beginPath();
+      ctx.moveTo(lampX, lampY + 14);
+      ctx.lineTo(lampX - 12, lampY + 10);
+      ctx.lineTo(lampX - 12, lampY + 4);
+      ctx.strokeStyle = "#2a3447";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      const lanternX = lampX - 12;
+      const lanternY = lampY + 12;
+
+      // Lantern top cap
+      ctx.fillStyle = "#151922";
+      ctx.beginPath();
+      ctx.moveTo(lanternX - 6, lanternY - 4);
+      ctx.lineTo(lanternX + 6, lanternY - 4);
+      ctx.lineTo(lanternX, lanternY - 9);
+      ctx.closePath();
+      ctx.fill();
+
+      // Lantern bottom rim
+      ctx.fillRect(lanternX - 5, lanternY + 8, 10, 2.5);
+
+      // Material 3 Respiration cycle & micro-flicker
+      const cyclePeriod = 3.2;
+      const cycleProgress = (elapsed % cyclePeriod) / cyclePeriod;
+      const easedCycle = m3Ease(cycleProgress < 0.5 ? cycleProgress * 2 : (1 - cycleProgress) * 2);
+      const flicker = Math.sin(elapsed * 17.1) * 0.015 + Math.cos(elapsed * 29.3) * 0.01;
+      const intensity = 0.88 + easedCycle * 0.22 + flicker;
+
+      // Outer atmospheric warm amber halo
+      const outerGlowRadius = Math.max(60, Math.min(width * 0.35, 140)) * intensity;
+      const outerGlow = ctx.createRadialGradient(
+        lanternX, lanternY, 2,
+        lanternX, lanternY, outerGlowRadius
+      );
+      outerGlow.addColorStop(0, "rgba(251, 191, 36, 0.45)");
+      outerGlow.addColorStop(0.25, "rgba(245, 158, 11, 0.22)");
+      outerGlow.addColorStop(0.55, "rgba(217, 119, 6, 0.08)");
+      outerGlow.addColorStop(1, "rgba(217, 119, 6, 0)");
+
+      ctx.save();
+      ctx.globalCompositeOperation = "screen";
+      ctx.fillStyle = outerGlow;
+      ctx.beginPath();
+      ctx.arc(lanternX, lanternY, outerGlowRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Specular highlight along steel rail
+      const railGlowGrad = ctx.createLinearGradient(lanternX, lanternY, rightBase, bottomY);
+      railGlowGrad.addColorStop(0, `rgba(251, 191, 36, ${0.45 * intensity})`);
+      railGlowGrad.addColorStop(0.7, `rgba(245, 158, 11, ${0.15 * intensity})`);
+      railGlowGrad.addColorStop(1, "rgba(245, 158, 11, 0)");
+
+      ctx.beginPath();
+      ctx.moveTo(vx + (rightBase - vx) * 0.3, vy + (bottomY - vy) * 0.3);
+      ctx.quadraticCurveTo(vx + (rightBase - vx) * 0.55, vy + (bottomY - vy) * 0.6, rightBase, bottomY);
+      ctx.lineWidth = 2.4;
+      ctx.strokeStyle = railGlowGrad;
+      ctx.stroke();
+
+      // Intense golden inner core
+      const innerGlowRadius = 24 * intensity;
+      const innerGlow = ctx.createRadialGradient(
+        lanternX, lanternY, 1,
+        lanternX, lanternY, innerGlowRadius
+      );
+      innerGlow.addColorStop(0, "rgba(255, 255, 255, 0.95)");
+      innerGlow.addColorStop(0.25, "rgba(254, 240, 138, 0.9)");
+      innerGlow.addColorStop(0.65, "rgba(245, 158, 11, 0.5)");
+      innerGlow.addColorStop(1, "rgba(245, 158, 11, 0)");
+
+      ctx.fillStyle = innerGlow;
+      ctx.beginPath();
+      ctx.arc(lanternX, lanternY, innerGlowRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Center filament
+      ctx.fillStyle = "#fffbeb";
+      ctx.beginPath();
+      ctx.arc(lanternX, lanternY + 1, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Glass cage struts
+      ctx.strokeStyle = "rgba(15, 20, 30, 0.75)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(lanternX - 4.5, lanternY - 3, 9, 11);
+
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        requestAnimationFrame(render);
+      }
+    }
+
+    requestAnimationFrame(render);
+  })();
 </script>
 </body>
 </html>
