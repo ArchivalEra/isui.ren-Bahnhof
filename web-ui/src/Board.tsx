@@ -280,17 +280,14 @@ const Scene = memo(function Scene({
                   </tr>
                 );
               })}
-              {!anyMatch && (
-                <tfoot>
-                  <tr>
-                    <td colSpan={6} class="no-match">
-                      KEIN TREFFER — nothing on the board matches “{query.trim()}”
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
             </tbody>
           </table>
+
+          {!anyMatch && (
+            <div class="board-empty" role="status" aria-live="polite">
+              KEIN TREFFER — nothing on the board matches “{query.trim()}”
+            </div>
+          )}
 
           <footer class="foot">AKTUALISIERT {updated} · SOLL/IST · LIVE</footer>
         </div>
