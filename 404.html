@@ -283,7 +283,9 @@ a:hover { border-bottom-color: var(--delay); }
 
   // 2. Astro-style intelligent path hint logic
   (function initAstroPathHint() {
-    const rawPath = window.location.pathname;
+    const urlParams = new URLSearchParams(window.location.search);
+    const fromParam = urlParams.get("from");
+    const rawPath = fromParam ? decodeURIComponent(fromParam) : window.location.pathname;
     const search = window.location.search;
     const hash = window.location.hash;
     const msgEl = document.getElementById("notice-msg");
