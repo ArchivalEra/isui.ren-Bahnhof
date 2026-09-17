@@ -72,10 +72,24 @@ const discovered = slugs
   .filter((slug) => !isBlocked(slug, patterns))
   .map((slug) => ({ slug, label: labelOf(slug), href: `/${slug}` }));
 
-const destinationsMap = new Map();
-for (const d of [...discovered, ...hardwired]) {
-  destinationsMap.set(d.href, d);
+function normHref(h) {
+  return h.toLowerCase().replace(/\/+$/, "") || "/";
 }
+
+const destinationsMap = new Map();
+// Hardwired items define authoritative label and canonical href
+for (const d of hardwired) {
+  destinationsMap.set(normHref(d.href), d);
+}
+
+for (const d of discovered) {
+  const norm = normHref(d.href);
+  if (norm === "/blog" || destinationsMap.has(norm)) {
+    continue; // deduplicate
+  }
+  destinationsMap.set(norm, d);
+}
+
 const destinations = Array.from(destinationsMap.values()).sort((a, b) => a.label.localeCompare(b.label));
 
 // -- Feed items: read every posts.json across all sub-site directories --

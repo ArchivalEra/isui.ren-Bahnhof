@@ -258,7 +258,11 @@ export function initialBoard(now: Date): { rows: Departure[]; mem: ScheduleMem }
   for (let di = 0; di < Math.max(1, DESTINATIONS.length); di++) {
     let spawn = nextSpawnAfter(undefined, di);
     for (let k = 0; k < ON_BOARD_PER_DEST && rows.length < MAX_ROWS; k++) {
-      rows.push(materialize(spawn));
+      const dep = materialize(spawn);
+      if (rows.some((r) => r.dest.trim().toLowerCase() === dep.dest.trim().toLowerCase())) {
+        break; // enforce unique destination label
+      }
+      rows.push(dep);
       mem[di] = { slot: spawn.slot, ms: spawn.departsAtMs };
       spawn = nextSpawnAfter(mem[di], di);
     }
@@ -353,6 +357,8 @@ export function tickBoard(
     let chosen: { di: number; spawn: Spawn } | null = null;
     for (let di = 0; di < Math.max(1, DESTINATIONS.length); di++) {
       if ((counts.get(di) ?? 0) >= ON_BOARD_PER_DEST) continue;
+      const d = DESTINATIONS[di];
+      if (d && rows.some((r) => r.dest.trim().toLowerCase() === d.label.trim().toLowerCase())) continue;
       const sp = nextSpawnAfter(mem[di], di);
       if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
     }
@@ -364,13 +370,20 @@ export function tickBoard(
       if (!_feedMap.has(di)) continue; // collision loser
       if (mem[di]) continue; // already scheduled
       if ((counts.get(di) ?? 0) > 0) continue; // already on the board
+      const fiLabel = fi.title.trim().toLowerCase();
+      if (rows.some((r) => r.dest.trim().toLowerCase() === fiLabel)) continue;
       const urlHash = hashStr(fi.url);
       const ms = anchorMs + 120_000 + (urlHash % (18_000_000 - 120_000));
       const sp: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
       if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
     }
     if (!chosen) break;
-    rows.push(materialize(chosen.spawn));
+    const nextDep = materialize(chosen.spawn);
+    if (rows.some((r) => r.dest.trim().toLowerCase() === nextDep.dest.trim().toLowerCase())) {
+      mem[chosen.di] = { slot: chosen.spawn.slot, ms: chosen.spawn.departsAtMs };
+      continue;
+    }
+    rows.push(nextDep);
     mem[chosen.di] = { slot: chosen.spawn.slot, ms: chosen.spawn.departsAtMs };
     changed = true;
   }
@@ -450,6 +463,8 @@ export function refreshFuture(
     let chosen: { di: number; spawn: Spawn } | null = null;
     for (let di = 0; di < Math.max(1, DESTINATIONS.length); di++) {
       if ((counts.get(di) ?? 0) >= ON_BOARD_PER_DEST) continue;
+      const d = DESTINATIONS[di];
+      if (d && rows.some((r) => r.dest.trim().toLowerCase() === d.label.trim().toLowerCase())) continue;
       const sp = nextSpawnAfter(mem[di], di);
       // don't schedule a destination whose next spawn is still beyond
       // horizon+5h without bound — but we must still fill the board,
@@ -461,14 +476,20 @@ export function refreshFuture(
       if (!_feedMap.has(di)) continue;
       if (mem[di]) continue;
       if ((counts.get(di) ?? 0) > 0) continue;
+      const fiLabel = fi.title.trim().toLowerCase();
+      if (rows.some((r) => r.dest.trim().toLowerCase() === fiLabel)) continue;
       const urlHash = hashStr(fi.url);
       const ms = anchorMs + 120_000 + (urlHash % (18_000_000 - 120_000));
       const sp: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
       if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
     }
     if (!chosen) break;
-    // ensure we don't duplicate a dest that is already on the kept board
-    rows = [...rows, materialize(chosen.spawn)];
+    const nextDep = materialize(chosen.spawn);
+    if (rows.some((r) => r.dest.trim().toLowerCase() === nextDep.dest.trim().toLowerCase())) {
+      mem[chosen.di] = { slot: chosen.spawn.slot, ms: chosen.spawn.departsAtMs };
+      continue;
+    }
+    rows = [...rows, nextDep];
     rows.sort((a, b) => a.departsAtMs - b.departsAtMs);
     mem[chosen.di] = { slot: chosen.spawn.slot, ms: chosen.spawn.departsAtMs };
     changed = true;

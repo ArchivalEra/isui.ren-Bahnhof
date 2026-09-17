@@ -14,3 +14,7 @@
 # isui.ren/test/*
 # drafts
 # *.global.isui.ren
+Blog
+Blog/*
+isui.ren/Blog
+isui.ren/Blog/*
