@@ -61,10 +61,22 @@ if (deployDir && existsSync(deployDir)) {
 }
 
 const patterns = loadBlacklist(blacklistFile);
-const destinations = slugs
+const hardwired = [
+  { slug: "mangomesa", label: "Mango Mesa", href: "/MangoMesa/" },
+  { slug: "compass", label: "Compass", href: "/MangoMesa/compass/" },
+  { slug: "projects", label: "Projects", href: "/MangoMesa/projects/" },
+  { slug: "repo-mirrors", label: "Repo Mirrors", href: "/repo/My-Shirone-Plugins/" },
+];
+
+const discovered = slugs
   .filter((slug) => !isBlocked(slug, patterns))
-  .sort((a, b) => a.localeCompare(b))
   .map((slug) => ({ slug, label: labelOf(slug), href: `/${slug}` }));
+
+const destinationsMap = new Map();
+for (const d of [...discovered, ...hardwired]) {
+  destinationsMap.set(d.href, d);
+}
+const destinations = Array.from(destinationsMap.values()).sort((a, b) => a.label.localeCompare(b.label));
 
 // -- Feed items: read every posts.json across all sub-site directories --
 const feedItems = [];
