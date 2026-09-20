@@ -65,7 +65,7 @@ const hardwired = [
   { slug: "mangomesa", label: "Mango Mesa", href: "/MangoMesa/" },
   { slug: "compass", label: "Compass", href: "/MangoMesa/compass/" },
   { slug: "projects", label: "Projects", href: "/MangoMesa/projects/" },
-  { slug: "repo-mirrors", label: "Repo Mirrors", href: "/repo/My-Shirone-Plugins/" },
+  { slug: "repo-mirrors", label: "Repo Mirrors", href: "/repo/" },
 ];
 
 const discovered = slugs

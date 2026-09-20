@@ -65,6 +65,24 @@ it exists only inside the build. If the deploy checkout is missing
 (local development without one), the script warns and falls back to
 the single known destination `heart`, so builds never break.
 
+## Hardwired destinations
+
+Some destinations are not deploy-branch directories and therefore
+cannot be discovered by the scanner. They are declared in the
+`hardwired` array at the top of `gen-destinations.mjs` and always
+survive the blacklist:
+
+| Slug           | Label        | Href                  |
+| -------------- | ------------ | --------------------- |
+| `mangomesa`    | Mango Mesa   | `/MangoMesa/`         |
+| `compass`      | Compass      | `/MangoMesa/compass/` |
+| `projects`     | Projects     | `/MangoMesa/projects/` |
+| `repo-mirrors` | Repo Mirrors | `/repo/`              |
+
+`Repo Mirrors` points at the edge repository portal, not at a single
+repository: `/repo/` renders every original public repository and
+proxies the ones that have GitHub Pages output.
+
 ## Nach naming rule
 
 The display label is the last path segment of the slug, with its first
