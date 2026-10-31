@@ -37,9 +37,9 @@ function ThemeOrb({
   onSwitch,
   orbRef,
 }: {
-  next: Profile;
-  onSwitch: () => void;
-  orbRef: RefObject<HTMLButtonElement>;
+  readonly next: Profile;
+  readonly onSwitch: () => void;
+  readonly orbRef: RefObject<HTMLButtonElement>;
 }) {
   return (
     <button
@@ -348,7 +348,7 @@ function Clock() {
   );
 }
 
-function StatusCell({ d, boarding }: { d: Departure; boarding: boolean }) {
+function StatusCell({ d, boarding }: { readonly d: Departure; readonly boarding: boolean }) {
   if (d.state === "departed")
     return (
       <span class="status dep">
