@@ -125,19 +125,18 @@ export async function waveEngineStart(opts: {
     const maxR = engine.max_radius(opts.orb.x, opts.orb.y) * 1.02;
     const start = performance.now();
 
-    let raf = 0;
     const done = new Promise<void>((resolve) => {
       const frame = () => {
         const t = Math.min(1, (performance.now() - start) / opts.durationMs);
         const eased = 1 - Math.pow(1 - t, 3);
         engine.frame(eased * maxR, (performance.now() - start) / 1000);
-        if (t < 1) raf = requestAnimationFrame(frame);
+        if (t < 1) requestAnimationFrame(frame);
         else {
           canvas.remove();
           resolve();
         }
       };
-      raf = requestAnimationFrame(frame);
+      requestAnimationFrame(frame);
     });
     return { done };
   } catch (err) {
