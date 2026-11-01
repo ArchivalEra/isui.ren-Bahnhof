@@ -27,7 +27,7 @@ export function webgl2Available(): boolean {
 
 let wasmReady: Promise<unknown> | null = null;
 function ensureWasm(): Promise<unknown> {
-  if (!wasmReady) wasmReady = import("./wave-wasm/bahnhof_wave.js").then((m) => m.default());
+  wasmReady ??= import("./wave-wasm/bahnhof_wave.js").then((m) => m.default());
   return wasmReady;
 }
 
