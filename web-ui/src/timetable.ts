@@ -314,40 +314,13 @@ export function tickBoard(
   const t = now.getTime();
   anchorMs = t;
   const mem: ScheduleMem = { ...memIn };
-  const rows: Departure[] = [];
-  let changed = false;
-
-  for (const row of prev) {
-    if (row.removalAt && t >= row.removalAt) {
-      changed = true;
-      continue; // left the station
-    }
-    if (
-      !row.removalAt &&
-      row.state !== "cancelled" &&
-      row.cancelAtMs &&
-      t >= row.cancelAtMs
-    ) {
-      // live failure: the train goes CANCELLED on the spot, mid-boarding
-      changed = true;
-      rows.push({ ...row, state: "cancelled", delayMin: undefined });
-      continue;
-    }
-    if (!row.removalAt && t >= row.departsAtMs) {
-      changed = true;
-      rows.push({
-        ...row,
-        state: row.state === "cancelled" ? "cancelled" : "departed",
-        removalAt: t + LINGER_MS,
-      });
-      continue;
-    }
-    rows.push(row);
-  }
+  const swept = sweepDueRows(prev, t);
 
   // refill: every destination under its one-row quota gets its next
   // train; whichever destination is next-in-time across the network
   // fills the tail first (unique NACH)
+  const rows = swept.rows;
+  let changed = swept.changed;
   let guard = 0;
   while (rows.length < MAX_ROWS && guard++ < 50) {
     const counts = new Map<number, number>();
@@ -389,6 +362,43 @@ export function tickBoard(
   }
 
   return changed ? { rows, mem, changed } : { rows: prev, mem: memIn, changed };
+}
+
+/** Cancel, depart, or drop each row that is due at `t`, in that order of
+ *  precedence. Reports whether anything moved off its previous state. */
+function sweepDueRows(prev: Departure[], t: number): { rows: Departure[]; changed: boolean } {
+  const rows: Departure[] = [];
+  let changed = false;
+
+  for (const row of prev) {
+    if (row.removalAt && t >= row.removalAt) {
+      changed = true;
+      continue; // left the station
+    }
+    if (
+      !row.removalAt &&
+      row.state !== "cancelled" &&
+      row.cancelAtMs &&
+      t >= row.cancelAtMs
+    ) {
+      // live failure: the train goes CANCELLED on the spot, mid-boarding
+      changed = true;
+      rows.push({ ...row, state: "cancelled", delayMin: undefined });
+      continue;
+    }
+    if (!row.removalAt && t >= row.departsAtMs) {
+      changed = true;
+      rows.push({
+        ...row,
+        state: row.state === "cancelled" ? "cancelled" : "departed",
+        removalAt: t + LINGER_MS,
+      });
+      continue;
+    }
+    rows.push(row);
+  }
+
+  return { rows, changed };
 }
 
 /** Force a full rebuild from the current clock and current feed set. */
