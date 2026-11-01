@@ -187,10 +187,8 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
 /* ---------- search-as-index (pure transparency, index plugs in later) ----------
    The input is a stable citizen of the layout: rows appearing or leaving
    above it change the board's size, never the input's geometry, focus,
-   or IME composition. */
-.board-search {
-  margin-top: 1rem;
-}
+   or IME composition. The single .board-search rule lives in the
+   window-on-the-wall layout section below. */
 .board-search-input {
   width: 100%;
   background: transparent;
@@ -324,6 +322,8 @@ td.cxl { color: var(--signal-delay); text-decoration: line-through; }
   z-index: 2;
   grid-row: 2;
   width: min(960px, calc(100vw - 2rem));
+  /* margin shorthand below supersedes the older margin-top: 1rem rule this
+     selector used to be declared in twice */
   margin: 0 auto;
   padding: 0.35rem 1rem max(env(safe-area-inset-bottom), 0.7rem);
   /* floats above the soft keyboard: --kb-inset is kept fresh by the
