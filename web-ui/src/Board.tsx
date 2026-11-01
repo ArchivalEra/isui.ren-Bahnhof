@@ -367,6 +367,19 @@ function varsOf(p: Profile): Record<string, string> {
   return o;
 }
 
+/** Resolve after `n` rendered frames. */
+function afterFrames(n: number): Promise<void> {
+  return new Promise<void>((resolve) => {
+    let left = n;
+    const step = () => {
+      left -= 1;
+      if (left <= 0) resolve();
+      else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
 interface SwitchAnim {
   from: Profile;
   to: Profile;
@@ -593,9 +606,7 @@ export default function Board() {
       setAnim({ from, to, cx, cy });
 
       // let the three scenes mount before driving the radius
-      await new Promise<void>((r) =>
-        requestAnimationFrame(() => requestAnimationFrame(() => r()))
-      );
+      await afterFrames(2);
 
       const maxR =
         Math.hypot(
