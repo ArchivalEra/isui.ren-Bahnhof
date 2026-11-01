@@ -518,61 +518,88 @@ export function shiftBoard(
   anchorMs = t;
   if (deltaMs === 0) return { rows: prev, mem: memIn, changed: false };
 
-  if (deltaMs > 0) {
-    // forward: drop anything that would depart within the next delta,
-    // keep the rest (still absolute times), then refill the tail.
-    const cutoff = t + deltaMs;
-    const kept = prev.filter((r) => r.departsAtMs > cutoff);
-    // keep mem for dropped dests (so next stays beyond), drop mem for
-    // dropped feeds (so they can be rescheduled) — same as refreshFuture
-    const mem: ScheduleMem = { ...memIn };
-    const droppedIdx = new Set(prev.filter((r) => r.departsAtMs <= cutoff).map((r) => r.destIdx));
-    const liveFeedIdx = new Set(getFeedItems().map((fi) => feedDestIdxFor(fi.url)));
-    for (const di of droppedIdx) {
-      // feed beyond window was dropped — always allow reschedule; feeds that
-      // no longer exist are pruned by the loop below
-      if (di >= FEED_OFFSET) delete mem[di];
-    }
-    // also drop mem for feeds that no longer exist
-    for (const k of Object.keys(mem)) {
-      const di = Number(k);
-      if (di >= FEED_OFFSET && !liveFeedIdx.has(di)) delete mem[di];
-    }
-    // refill from kept
-    let rows = kept.slice().sort((a, b) => a.departsAtMs - b.departsAtMs);
-    let changed = kept.length !== prev.length;
-    let guard = 0;
-    while (rows.length < MAX_ROWS && guard++ < 50) {
-      const counts = new Map<number, number>();
-      for (const r of rows) counts.set(r.destIdx, (counts.get(r.destIdx) ?? 0) + 1);
-      let chosen: { di: number; spawn: Spawn } | null = null;
-      for (let di = 0; di < Math.max(1, DESTINATIONS.length); di++) {
-        if ((counts.get(di) ?? 0) >= ON_BOARD_PER_DEST) continue;
-        const sp = nextSpawnAfter(mem[di], di);
-        if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
-      }
-      for (const fi of getFeedItems()) {
-        const di = feedDestIdxFor(fi.url);
-        if (!_feedMap.has(di)) continue;
-        if (mem[di]) continue;
-        if ((counts.get(di) ?? 0) > 0) continue;
-        const h = hashStr(fi.url);
-        const ms = anchorMs + 120_000 + (h % (18_000_000 - 120_000));
-        const sp: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
-        if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
-      }
-      if (!chosen) break;
-      rows = [...rows, materialize(chosen.spawn)].sort((a, b) => a.departsAtMs - b.departsAtMs);
-      mem[chosen.di] = { slot: chosen.spawn.slot, ms: chosen.spawn.departsAtMs };
-      changed = true;
-    }
-    return { rows, mem, changed };
-  } else {
+  if (deltaMs < 0) {
     // rewind: show the timetable as it looked delta ago (including
     // departures that have since left). No filtering to future — the
     // user explicitly asked to rewind.
-    const earlier = new Date(t + deltaMs);
-    const regenerated = initialBoard(earlier);
+    const regenerated = initialBoard(new Date(t + deltaMs));
     return { rows: regenerated.rows, mem: regenerated.mem, changed: true };
   }
+
+  // forward: drop anything that would depart within the next delta,
+  // keep the rest (still absolute times), then refill the tail.
+  const cutoff = t + deltaMs;
+  const kept = prev.filter((r) => r.departsAtMs > cutoff);
+  const mem: ScheduleMem = { ...memIn };
+  pruneWindowMem(prev, cutoff, mem);
+  const filled = refillTail(kept.slice().sort(byDeparture), mem);
+  return { rows: filled.rows, mem, changed: kept.length !== prev.length || filled.added };
+}
+
+/** Keep mem for dropped destinations (so the next train stays beyond the
+ *  window) but drop it for dropped feeds, and for feeds that no longer
+ *  exist, so those can be scheduled again. */
+function pruneWindowMem(prev: Departure[], cutoff: number, mem: ScheduleMem): void {
+  const droppedIdx = new Set(prev.filter((r) => r.departsAtMs <= cutoff).map((r) => r.destIdx));
+  const liveFeedIdx = new Set(getFeedItems().map((fi) => feedDestIdxFor(fi.url)));
+  for (const di of droppedIdx) {
+    if (di >= FEED_OFFSET) delete mem[di];
+  }
+  for (const k of Object.keys(mem)) {
+    const di = Number(k);
+    if (di >= FEED_OFFSET && !liveFeedIdx.has(di)) delete mem[di];
+  }
+}
+
+function byDeparture(a: Departure, b: Departure): number {
+  return a.departsAtMs - b.departsAtMs;
+}
+
+/** Append the next-in-time candidate until the board is full, keeping it
+ *  sorted by departure time. Mutates `mem` and reports whether it grew. */
+function refillTail(
+  rowsIn: Departure[],
+  mem: ScheduleMem,
+): { rows: Departure[]; added: boolean } {
+  let rows = rowsIn;
+  let added = false;
+  let guard = 0;
+  while (rows.length < MAX_ROWS && guard++ < 50) {
+    const chosen = pickNextCandidate(rows, mem);
+    if (!chosen) break;
+    rows = [...rows, materialize(chosen.spawn)].sort(byDeparture);
+    mem[chosen.di] = { slot: chosen.spawn.slot, ms: chosen.spawn.departsAtMs };
+    added = true;
+  }
+  return { rows, added };
+}
+
+/** Soonest candidate across destination and feed timelines that is still
+ *  under its per-destination quota. */
+function pickNextCandidate(
+  rows: Departure[],
+  mem: ScheduleMem,
+): { di: number; spawn: Spawn } | null {
+  const counts = new Map<number, number>();
+  for (const r of rows) counts.set(r.destIdx, (counts.get(r.destIdx) ?? 0) + 1);
+  let chosen: { di: number; spawn: Spawn } | null = null;
+
+  for (let di = 0; di < Math.max(1, DESTINATIONS.length); di++) {
+    if ((counts.get(di) ?? 0) >= ON_BOARD_PER_DEST) continue;
+    const sp = nextSpawnAfter(mem[di], di);
+    if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
+  }
+
+  for (const fi of getFeedItems()) {
+    const di = feedDestIdxFor(fi.url);
+    if (!_feedMap.has(di)) continue;
+    if (mem[di]) continue;
+    if ((counts.get(di) ?? 0) > 0) continue;
+    const h = hashStr(fi.url);
+    const ms = anchorMs + 120_000 + (h % (18_000_000 - 120_000));
+    const sp: Spawn = { destIdx: di, slot: 1, departsAtMs: ms };
+    if (!chosen || sp.departsAtMs < chosen.spawn.departsAtMs) chosen = { di, spawn: sp };
+  }
+
+  return chosen;
 }
