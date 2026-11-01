@@ -433,23 +433,8 @@ export function refreshFuture(
   // next spawn stays beyond horizon rather than jumping to 2..15min).
   // For feed items: drop mem for URLs that no longer exist in the feed set.
   const mem: ScheduleMem = { ...memIn };
-  const droppedIdx = new Set(prev.filter((r) => r.departsAtMs > horizon).map((r) => r.destIdx));
   const liveFeedIdx = new Set(getFeedItems().map((fi) => feedDestIdxFor(fi.url)));
-
-  for (const k of Object.keys(mem)) {
-    const di = Number(k);
-    const isFeed = di >= FEED_OFFSET;
-    if (isFeed && !liveFeedIdx.has(di)) {
-      delete mem[di];
-      continue;
-    }
-    if (isFeed && droppedIdx.has(di)) {
-      // feed beyond horizon was dropped — allow it to be rescheduled
-      // (single-shot feeds need a new deterministic slot after the refresh)
-      delete mem[di];
-      continue;
-    }
-  }
+  pruneAgedFeedMem(mem, prev, horizon, liveFeedIdx);
 
   // if nothing was dropped and no new feed arrived, still allow new feed
   // items (not yet in mem) to be scheduled by the refill loop
@@ -558,6 +543,23 @@ function pruneWindowMem(prev: Departure[], cutoff: number, mem: ScheduleMem): vo
   for (const k of Object.keys(mem)) {
     const di = Number(k);
     if (di >= FEED_OFFSET && !liveFeedIdx.has(di)) delete mem[di];
+  }
+}
+
+/** Drop scheduled-feed memory whose URL left the feed set, and whose
+ *  departure now sits beyond the horizon (so a single-shot feed can be
+ *  rescheduled to a new deterministic slot). */
+function pruneAgedFeedMem(
+  mem: ScheduleMem,
+  prev: Departure[],
+  horizon: number,
+  liveFeedIdx: Set<number>,
+): void {
+  const droppedIdx = new Set(prev.filter((r) => r.departsAtMs > horizon).map((r) => r.destIdx));
+  for (const k of Object.keys(mem)) {
+    const di = Number(k);
+    if (di < FEED_OFFSET) continue;
+    if (!liveFeedIdx.has(di) || droppedIdx.has(di)) delete mem[di];
   }
 }
 
