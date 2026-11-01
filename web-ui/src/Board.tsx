@@ -380,6 +380,24 @@ function afterFrames(n: number): Promise<void> {
   });
 }
 
+/** Run `onFrame` once per animation frame until `durationMs` has elapsed
+ *  since `start`, then resolve. `onFrame` receives eased progress 0..1. */
+function animateUntil(
+  start: number,
+  durationMs: number,
+  onFrame: (progress: number) => void,
+): Promise<void> {
+  return new Promise<void>((resolve) => {
+    const frame = () => {
+      const t = Math.min(1, (performance.now() - start) / durationMs);
+      onFrame(t);
+      if (t < 1) requestAnimationFrame(frame);
+      else resolve();
+    };
+    requestAnimationFrame(frame);
+  });
+}
+
 interface SwitchAnim {
   from: Profile;
   to: Profile;
@@ -625,9 +643,7 @@ export default function Board() {
       const failsafe = setTimeout(commit, WAVE_MS + 900);
 
       try {
-        await new Promise<void>((resolve) => {
-          const frame = () => {
-          const t = Math.min(1, (performance.now() - start) / WAVE_MS);
+        await animateUntil(start, WAVE_MS, (t) => {
           const eased = 1 - Math.pow(1 - t, 3);
           const R = Math.max(1, eased * maxR);
           if (toRef.current) toRef.current.style.clipPath = `circle(${R}px at ${cx}px ${cy}px)`;
@@ -640,10 +656,6 @@ export default function Board() {
             c.style.top = `${cy - R}px`;
             c.style.opacity = String(Math.min(1, (1 - t) * 3 + 0.25));
           }
-            if (t < 1) requestAnimationFrame(frame);
-            else resolve();
-          };
-          requestAnimationFrame(frame);
         });
       } finally {
         clearTimeout(failsafe);
