@@ -529,11 +529,9 @@ export function shiftBoard(
     const droppedIdx = new Set(prev.filter((r) => r.departsAtMs <= cutoff).map((r) => r.destIdx));
     const liveFeedIdx = new Set(getFeedItems().map((fi) => feedDestIdxFor(fi.url)));
     for (const di of droppedIdx) {
-      if (di >= FEED_OFFSET) {
-        // feed beyond window was dropped — allow reschedule (if still live)
-        if (liveFeedIdx.has(di)) delete mem[di];
-        else delete mem[di];
-      }
+      // feed beyond window was dropped — always allow reschedule; feeds that
+      // no longer exist are pruned by the loop below
+      if (di >= FEED_OFFSET) delete mem[di];
     }
     // also drop mem for feeds that no longer exist
     for (const k of Object.keys(mem)) {
