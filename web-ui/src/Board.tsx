@@ -21,10 +21,9 @@ import {
   type Departure,
   type ScheduleMem,
 } from "./timetable";
-import { DESTINATIONS } from "./destinations.generated";
 import { waveEngineStart } from "./wave-engine";
 import { startFeedWatcher } from "./feed-watcher";
-import type { ComponentChildren, RefObject } from "preact";
+import type { RefObject } from "preact";
 
 const TIME_STEP_MS = 15 * 60_000; // 15 min per click — matches MIN_GAP_MS
 
