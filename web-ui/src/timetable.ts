@@ -423,7 +423,6 @@ export function refreshFuture(
   // next spawn stays beyond horizon rather than jumping to 2..15min).
   // For feed items: drop mem for URLs that no longer exist in the feed set.
   const mem: ScheduleMem = { ...memIn };
-  const keptIdx = new Set(kept.map((r) => r.destIdx));
   const droppedIdx = new Set(prev.filter((r) => r.departsAtMs > horizon).map((r) => r.destIdx));
   const liveFeedIdx = new Set(getFeedItems().map((fi) => feedDestIdxFor(fi.url)));
 
@@ -440,10 +439,6 @@ export function refreshFuture(
       delete mem[di];
       continue;
     }
-    // destination rows beyond horizon were dropped — keep their mem so the
-    // next departure stays disciplined (15..40min after the dropped one),
-    // i.e. still beyond the horizon, not snapping forward.
-    void keptIdx;
   }
 
   // if nothing was dropped and no new feed arrived, still allow new feed
