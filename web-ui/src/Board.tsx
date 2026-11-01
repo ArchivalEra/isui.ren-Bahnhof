@@ -245,19 +245,14 @@ const Scene = memo(function Scene({
                 const leaving =
                   d.state === "departed" ||
                   (d.state === "cancelled" && !!d.removalAt);
+                // a plain if-chain keeps the precedence readable and avoids
+                // the ternary nested three levels deep this used to be
+                let rowClass = "";
+                if (leaving) rowClass = "gone";
+                else if (boarding) rowClass = "now";
+                else if (!matchesQuery(d)) rowClass = "dim";
                 return (
-                  <tr
-                    key={d.id}
-                    class={
-                      leaving
-                        ? "gone"
-                        : boarding
-                          ? "now"
-                          : matchesQuery(d)
-                            ? ""
-                            : "dim"
-                    }
-                  >
+                  <tr key={d.id} class={rowClass}>
                     <td class={d.state === "cancelled" ? "cxl" : ""}>
                       <span>{d.time}</span>
                     </td>
