@@ -519,7 +519,7 @@ export default function Board() {
     while (cut < prev.length && !ids.includes(prev[cut])) cut++;
     if (!cut) return;
 
-    const kids = Array.from(tbodyRef.current.children) as HTMLElement[];
+    const kids = Array.from(tbodyRef.current.rows);
     const step = (kids[0]?.getBoundingClientRect().height ?? 41) * cut;
     for (const el of kids) {
       el.style.transition = "none";
