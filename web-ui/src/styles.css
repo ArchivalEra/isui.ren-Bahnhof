@@ -139,6 +139,9 @@ body {
 }
 
 .board-empty {
+  /* <output> is inline by default: block keeps the old full-width box
+     geometry so the message stays centered exactly as before */
+  display: block;
   margin-top: 0.75rem;
   padding: 0.9rem 1rem;
   text-align: center;

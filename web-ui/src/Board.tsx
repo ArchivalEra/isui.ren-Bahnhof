@@ -283,9 +283,9 @@ const Scene = memo(function Scene({
           </table>
 
           {!anyMatch && (
-            <div class="board-empty" role="status" aria-live="polite">
+            <output class="board-empty" aria-live="polite">
               KEIN TREFFER — nothing on the board matches “{query.trim()}”
-            </div>
+            </output>
           )}
 
           <footer class="foot">AKTUALISIERT {updated} · SOLL/IST · LIVE</footer>
