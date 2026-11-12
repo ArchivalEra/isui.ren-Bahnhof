@@ -1,0 +1,93 @@
+name: Code quality assessment
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '29 6 * * 1'
+  pull_request:
+
+permissions:
+  contents: read
+
+# Local equivalent of GitHub Code Quality. Bahnhof intentionally has no
+# Einfacht (2026-10-31 jurisdiction decision); this workflow only runs the
+# toolchains the repo already ships: TypeScript (web-ui) and Rust (web-wave).
+jobs:
+  assess:
+    name: Assess isui.ren-Bahnhof
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web-ui/package-lock.json
+
+      - name: Set up Rust (wasm target)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - name: Install web-ui dependencies
+        # package-lock.json carries two remote tarball URLs (Tencent npm mirror);
+        # npm's default allow-remote=none (EALLOWREMOTE) blocks them locally.
+        # allow-remote=all in CI keeps the lockfile authoritative without
+        # rewriting it. If the mirror is unreachable, npm install is soft.
+        continue-on-error: true
+        run: cd web-ui && npm ci --no-audit --no-fund --allow-remote=all
+
+      - name: Run checks
+        id: checks
+        shell: bash
+        run: |
+          set +e
+          : > results.tsv
+          record() { printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> results.tsv; }
+
+          (cd web-ui && npx tsc --noEmit) > /tmp/tsc.log 2>&1
+          record 'web-ui-typescript' 'tsc --noEmit' "$?"
+
+          (cd web-ui && npm run build) > /tmp/vite-build.log 2>&1
+          record 'web-ui-build' 'vite build' "$?"
+
+          (cd web-wave && cargo check --target wasm32-unknown-unknown) > /tmp/cargo-check.log 2>&1
+          record 'wave-rust-check' 'cargo check --target wasm32-unknown-unknown' "$?"
+
+          (cd web-wave && cargo test) > /tmp/cargo-test.log 2>&1
+          record 'wave-rust-tests' 'cargo test' "$?"
+
+          cat results.tsv
+
+      - name: Publish summary
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## Code quality assessment — isui.ren-Bahnhof"
+            echo ""
+            echo "| Check | Command | Result |"
+            echo "|---|---|---|"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [ -f results.tsv ]; then
+            while IFS=$'\t' read -r n c rc; do
+              badge=$([ "$rc" = "0" ] && echo PASS || echo "FAIL (rc=$rc)")
+              printf '| %s | \`%s\` | %s |\n' "$n" "$c" "$badge" >> "$GITHUB_STEP_SUMMARY"
+            done < results.tsv
+          else
+            echo "| (no results) | — | — |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "No Einfacht integration by decision (2026-10-31); GitRoll round-3 reported 0 detail rows." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-logs
+          path: /tmp/*.log
+          if-no-files-found: ignore
