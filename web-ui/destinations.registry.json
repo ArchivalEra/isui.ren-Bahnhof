@@ -1,0 +1,45 @@
+{
+  "$comment": "Station registry — destinations the deploy-branch directory scan cannot see or must not guess. The scanner (scripts/gen-destinations.mjs) merges these with discovered deploy-branch slots; an entry here wins on slug collision. Add one object per site; never edit destinations.generated.ts.",
+  "stations": [
+    {
+      "slug": "mangomesa",
+      "label": "Mango Mesa",
+      "href": "/MangoMesa/"
+    },
+    {
+      "slug": "compass",
+      "label": "Compass",
+      "href": "/MangoMesa/compass/"
+    },
+    {
+      "slug": "projects",
+      "label": "Projects",
+      "href": "/MangoMesa/projects/"
+    },
+    {
+      "slug": "repo-mirrors",
+      "label": "Repo Mirrors",
+      "href": "/repo/"
+    },
+    {
+      "slug": "octave",
+      "label": "Octave",
+      "href": "/repo/Octave/"
+    },
+    {
+      "slug": "s26",
+      "label": "S26",
+      "href": "/repo/S26-1_202609/"
+    },
+    {
+      "slug": "static-contract",
+      "label": "Static Contract",
+      "href": "https://static.isui.ren/"
+    },
+    {
+      "slug": "mijo",
+      "label": "Mijo",
+      "href": "/Mijo/"
+    }
+  ]
+}

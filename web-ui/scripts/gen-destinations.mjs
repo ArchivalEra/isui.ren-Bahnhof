@@ -61,12 +61,27 @@ if (deployDir && existsSync(deployDir)) {
 }
 
 const patterns = loadBlacklist(blacklistFile);
-const hardwired = [
-  { slug: "mangomesa", label: "Mango Mesa", href: "/MangoMesa/" },
-  { slug: "compass", label: "Compass", href: "/MangoMesa/compass/" },
-  { slug: "projects", label: "Projects", href: "/MangoMesa/projects/" },
-  { slug: "repo-mirrors", label: "Repo Mirrors", href: "/repo/" },
-];
+
+// Declarative station registry: destinations the directory scan cannot
+// see (second-level slots like repo/Octave, foreign hosts like
+// static.isui.ren) or must not label-guess. Wins on slug collision
+// with scan results.
+const registryFile = path.join(path.dirname(blacklistFile ?? "."), "destinations.registry.json");
+let registry = [];
+if (registryFile && existsSync(registryFile)) {
+  try {
+    const parsed = JSON.parse(readFileSync(registryFile, "utf8"));
+    if (Array.isArray(parsed.stations)) {
+      for (const s of parsed.stations) {
+        if (s && typeof s.slug === "string" && typeof s.href === "string") {
+          registry.push({ slug: s.slug, label: s.label ?? labelOf(s.slug), href: s.href });
+        }
+      }
+    }
+  } catch (e) {
+    console.warn(`[gen-destinations] bad registry ${registryFile}:`, e.message);
+  }
+}
 
 const discovered = slugs
   .filter((slug) => !isBlocked(slug, patterns))
@@ -77,8 +92,8 @@ function normHref(h) {
 }
 
 const destinationsMap = new Map();
-// Hardwired items define authoritative label and canonical href
-for (const d of hardwired) {
+// Registry entries are authoritative labels and canonical hrefs
+for (const d of registry) {
   destinationsMap.set(normHref(d.href), d);
 }
 
@@ -121,9 +136,10 @@ if (deployDir && existsSync(deployDir)) {
 }
 
 const body = `// GENERATED at build time by scripts/gen-destinations.mjs - do not edit.
-// Source of truth: live page directories on the heart deploy branch,
-// minus everything the build-time blacklist filters out. The blacklist
-// itself never ships: the browser only ever sees this result.
+// Sources: the station registry (destinations.registry.json) plus live
+// page directories discovered on the heart deploy branch, minus the
+// build-time blacklist. The blacklist and registry never ship: the
+// browser only ever sees the merged result.
 
 export interface Destination {
   slug: string;

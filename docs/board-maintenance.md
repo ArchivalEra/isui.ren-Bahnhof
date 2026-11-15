@@ -10,7 +10,7 @@ has to guess again.
 |---|---|---|---|
 | **Board logic & rules** | **isui.ren-Bahnhof** | `web-ui/scripts/gen-destinations.mjs` (discovery), `web-ui/board.blacklist` (what to hide), `web-ui/src/timetable.ts` (schedule discipline), `web-ui/src/Board.tsx` (rendering), `docs/board-*.md` | Humans + Bahnhof CI |
 | **Edge configuration** | **isui.ren-heart (main)** | `site-root/edgeone.json` (redirects/normalization), `site-root/index.html` + `logo.*` (hop page, favicon source) | Humans, rarely |
-| **Deploy artifacts** | **isui.ren-heart (deploy branch)** | Build output only: `Bahnhof/`, `Blog/`, `heart/`, root `404.html` | **Machines only** (CI pipelines). Never hand-edit. |
+| **Deploy artifacts** | **isui.ren-heart (deploy branch)** | Build output only: `Bahnhof/`, `Blog/`, `heart/`, `MangoMesa/`, `Mijo/`, `repo/`, root `404.html` | **Machines only** (CI pipelines). Never hand-edit. |
 
 ## The rules
 

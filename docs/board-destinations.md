@@ -65,23 +65,41 @@ it exists only inside the build. If the deploy checkout is missing
 (local development without one), the script warns and falls back to
 the single known destination `heart`, so builds never break.
 
-## Hardwired destinations
+## The station registry
 
-Some destinations are not deploy-branch directories and therefore
-cannot be discovered by the scanner. They are declared in the
-`hardwired` array at the top of `gen-destinations.mjs` and always
-survive the blacklist:
+Some destinations are not top-level deploy-branch directories and
+therefore cannot be discovered by the scanner: second-level slots
+(`repo/Octave`, `repo/S26-1_202609`), foreign hosts
+(`https://static.isui.ren/`), and sites whose display label must not
+be guessed from a slug. They are declared in the station registry,
+`web-ui/destinations.registry.json` (committed, reviewed in PRs):
 
-| Slug           | Label        | Href                  |
-| -------------- | ------------ | --------------------- |
-| `mangomesa`    | Mango Mesa   | `/MangoMesa/`         |
-| `compass`      | Compass      | `/MangoMesa/compass/` |
-| `projects`     | Projects     | `/MangoMesa/projects/` |
-| `repo-mirrors` | Repo Mirrors | `/repo/`              |
+```json
+{ "stations": [ { "slug": "octave", "label": "Octave", "href": "/repo/Octave/" } ] }
+```
+
+The scanner merges registry entries with scan results; a registry
+entry wins on slug collision and its label/href are authoritative.
+The registry never ships to the browser — same build-time-only rule
+as the blacklist. Current registry entries:
+
+| Slug             | Label          | Href                        |
+| ---------------- | -------------- | --------------------------- |
+| `mangomesa`      | Mango Mesa     | `/MangoMesa/`               |
+| `compass`        | Compass        | `/MangoMesa/compass/`       |
+| `projects`       | Projects       | `/MangoMesa/projects/`      |
+| `repo-mirrors`   | Repo Mirrors   | `/repo/`                    |
+| `octave`         | Octave         | `/repo/Octave/`             |
+| `s26`            | S26            | `/repo/S26-1_202609/`       |
+| `static-contract`| Static Contract| `https://static.isui.ren/`  |
+| `mijo`           | Mijo           | `/Mijo/`                    |
 
 `Repo Mirrors` points at the edge repository portal, not at a single
 repository: `/repo/` renders every original public repository and
-proxies the ones that have GitHub Pages output.
+proxies the ones that have GitHub Pages output. `Static Contract`
+lives on its own accelerated subdomain, outside the deploy branch.
+A top-level slot that also has an index.html (e.g. `Mijo/`) is
+discovered by the scan too; the registry only pins its label.
 
 ## Nach naming rule
 
